@@ -1,0 +1,168 @@
+const $ = (s, root = document) => root.querySelector(s);
+const $$ = (s, root = document) => [...root.querySelectorAll(s)];
+
+// Scroll reveal
+const revealObserver = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (entry.isIntersecting) entry.target.classList.add('visible');
+  });
+}, { threshold: 0.12 });
+$$('.reveal').forEach((el) => revealObserver.observe(el));
+
+// Mobile navigation + dropdown menus
+const menuBtn = $('.menu');
+const navLinks = $('.navlinks');
+menuBtn?.addEventListener('click', () => navLinks?.classList.toggle('mobile-open'));
+$$('.nav-dropdown').forEach((dropdown) => {
+  const btn = $('.nav-drop-btn', dropdown);
+  btn?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    $$('.nav-dropdown').forEach((d) => { if (d !== dropdown) d.classList.remove('open'); });
+    dropdown.classList.toggle('open');
+  });
+});
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.nav')) $$('.nav-dropdown').forEach((d) => d.classList.remove('open'));
+});
+$$('.navlinks a').forEach((a) => a.addEventListener('click', () => navLinks?.classList.remove('mobile-open')));
+
+// Back to top
+const topBtn = $('.top-btn');
+window.addEventListener('scroll', () => topBtn?.classList.toggle('show', window.scrollY > 500), { passive: true });
+topBtn?.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+// WhatsApp
+$$('[data-whatsapp]').forEach((button) => button.addEventListener('click', () => {
+  window.open('https://wa.me/917319798299?text=Hello%20Mishnex%20Technologies,%20I%20would%20like%20to%20discuss%20a%20project.', '_blank', 'noopener');
+}));
+
+// Animated circular counters
+const counterObserver = new IntersectionObserver((entries, observer) => {
+  entries.forEach((entry) => {
+    if (!entry.isIntersecting) return;
+    const value = $('.counter-value', entry.target);
+    const ring = $('.counter-ring', entry.target);
+    if (!value || !ring || value.dataset.animated === 'true') return;
+    value.dataset.animated = 'true';
+    const target = Number(value.dataset.target || 0);
+    const suffix = value.dataset.suffix || '';
+    const duration = target > 500 ? 2100 : 1500;
+    const start = performance.now();
+    const ease = (t) => 1 - Math.pow(1 - t, 3);
+    const tick = (now) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const current = Math.floor(target * ease(progress));
+      value.textContent = current.toLocaleString('en-IN') + suffix;
+      ring.style.setProperty('--progress', `${360 * progress}deg`);
+      if (progress < 1) requestAnimationFrame(tick);
+      else value.textContent = target.toLocaleString('en-IN') + suffix;
+    };
+    requestAnimationFrame(tick);
+    observer.unobserve(entry.target);
+  });
+}, { threshold: 0.35 });
+$$('.stat').forEach((stat) => { if ($('.counter-value', stat)) counterObserver.observe(stat); });
+
+// Live form validation
+function setupForm(form) {
+  const fields = {
+    name: { err: 'nameErr', validate: (v) => /^[A-Za-z][A-Za-z .'-]{1,49}$/.test(v), message: 'Name can contain letters and spaces only.' },
+    email: { err: 'emailErr', validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v), message: 'Please enter a valid email address.' },
+    phone: { err: 'phoneErr', validate: (v) => /^\d{10}$/.test(v), message: 'Mobile number must contain exactly 10 digits.' },
+    service: { err: 'serviceErr', validate: (v) => Boolean(v), message: 'Please select a service.' },
+    requirement: { err: 'requirementErr', validate: (v) => v.length >= 10, message: 'Please describe your requirement in at least 10 characters.' }
+  };
+
+  const getError = (name) => $(`#${fields[name].err}`, form);
+  const getInput = (name) => $(`[name="${name}"]`, form);
+
+  const clearState = (name) => {
+    const input = getInput(name), error = getError(name);
+    input?.classList.remove('invalid', 'valid');
+    if (error) error.textContent = '';
+  };
+  const validateField = (name, force = false) => {
+    const input = getInput(name), error = getError(name);
+    if (!input) return true;
+    const value = input.value.trim();
+    if (!value && !force) { clearState(name); return true; }
+    const valid = fields[name].validate(value);
+    input.classList.toggle('invalid', !valid);
+    input.classList.toggle('valid', valid);
+    if (error) error.textContent = valid ? '' : fields[name].message;
+    return valid;
+  };
+
+  Object.keys(fields).forEach((name) => {
+    const input = getInput(name);
+    if (!input) return;
+    const eventName = input.tagName === 'SELECT' ? 'change' : 'input';
+    input.addEventListener(eventName, () => validateField(name, false));
+    input.addEventListener('blur', () => validateField(name, true));
+  });
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const ok = Object.keys(fields).every((name) => validateField(name, true));
+    const success = $('#formSuccess', form);
+    if (!ok) {
+      if (success) success.style.display = 'none';
+      return;
+    }
+    if (success) {
+      success.textContent = '✓ Your enquiry details have been validated successfully.';
+      success.style.display = 'block';
+      success.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 450, easing: 'ease-out' });
+    }
+  });
+}
+$$('.lead-form').forEach(setupForm);
+
+// Continuous infinite testimonial slider. It pauses only while the cursor/focus is over the review area.
+$$('.testimonials').forEach((section) => {
+  const viewport = $('.t-viewport', section);
+  const track = $('.t-track', section);
+  if (!viewport || !track) return;
+  const original = [...track.children];
+  if (original.length < 2) return;
+  original.forEach((card) => track.appendChild(card.cloneNode(true)));
+  let offset = 0;
+  let paused = false;
+  let last = performance.now();
+  const speed = () => window.innerWidth < 600 ? 0.34 : 0.48;
+  const halfWidth = () => track.scrollWidth / 2;
+  const frame = (now) => {
+    const dt = Math.min(now - last, 40);
+    last = now;
+    if (!paused) {
+      offset += speed() * dt;
+      const limit = halfWidth();
+      if (offset >= limit) offset -= limit;
+      track.style.transform = `translate3d(${-offset}px,0,0)`;
+    }
+    requestAnimationFrame(frame);
+  };
+  const pause = () => { paused = true; };
+  const resume = () => { paused = false; last = performance.now(); };
+  viewport.addEventListener('mouseenter', pause);
+  viewport.addEventListener('mouseleave', resume);
+  viewport.addEventListener('focusin', pause);
+  viewport.addEventListener('focusout', resume);
+
+  // Manual arrows: temporarily pause and move by one card, then resume.
+  const moveManual = (direction) => {
+    paused = true;
+    const card = $('.review', track);
+    const step = (card?.getBoundingClientRect().width || 360) + 20;
+    offset += direction * step;
+    const limit = halfWidth();
+    if (offset < 0) offset += limit;
+    if (offset >= limit) offset -= limit;
+    track.style.transition = 'transform .45s cubic-bezier(.22,.8,.2,1)';
+    track.style.transform = `translate3d(${-offset}px,0,0)`;
+    setTimeout(() => { track.style.transition = ''; resume(); }, 500);
+  };
+  $('.circle[data-prev]', section)?.addEventListener('click', () => moveManual(-1));
+  $('.circle[data-next]', section)?.addEventListener('click', () => moveManual(1));
+  requestAnimationFrame(frame);
+});
