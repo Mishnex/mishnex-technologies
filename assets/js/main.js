@@ -109,11 +109,12 @@ function setupForm(form) {
       if (success) success.style.display = 'none';
       return;
     }
-    if (success) {
-      success.textContent = '✓ Your enquiry details have been validated successfully.';
-      success.style.display = 'block';
-      success.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 450, easing: 'ease-out' });
+    if (form.closest('body') && location.pathname.toLowerCase().includes('contact')) {
+      const modal = $('#successModal');
+      if (modal) { modal.classList.add('show'); modal.setAttribute('aria-hidden','false'); }
+      form.reset();
     }
+    if (success) success.style.display = 'none';
   });
 }
 $$('.lead-form').forEach(setupForm);
@@ -129,7 +130,7 @@ $$('.testimonials').forEach((section) => {
   let offset = 0;
   let paused = false;
   let last = performance.now();
-  const speed = () => window.innerWidth < 600 ? 0.34 : 0.48;
+  const speed = () => window.innerWidth < 600 ? 0.16 : 0.22;
   const halfWidth = () => track.scrollWidth / 2;
   const frame = (now) => {
     const dt = Math.min(now - last, 40);
@@ -166,3 +167,61 @@ $$('.testimonials').forEach((section) => {
   $('.circle[data-next]', section)?.addEventListener('click', () => moveManual(1));
   requestAnimationFrame(frame);
 });
+
+// Contact form: prefilled WhatsApp message and email handoff.
+function buildLeadMessage(form) {
+  const data = new FormData(form);
+  return [
+    'Hello Mishnex Technologies, I would like to discuss a project.', '',
+    `Name: ${data.get('name') || '-'}`,
+    `Mobile: ${data.get('phone') || '-'}`,
+    `Email: ${data.get('email') || '-'}`,
+    `Service: ${data.get('service') || '-'}`,
+    `Estimated Budget: ${data.get('budget') || 'Not decided'}`,
+    `Preferred Call Time: ${data.get('calltime') || 'ASAP / Next available'}`,
+    `Project Message: ${data.get('requirement') || '-'}`
+  ].join('\n');
+}
+$$('.whatsapp-form-btn').forEach((button) => button.addEventListener('click', () => {
+  const form = button.closest('form');
+  if (!form) return;
+  window.open(`https://wa.me/917319798299?text=${encodeURIComponent(buildLeadMessage(form))}`, '_blank', 'noopener');
+}));
+
+// Project Builder live estimate.
+const builder = $('.builder');
+if (builder) {
+  let currency = 'usd';
+  const featurePrices = { usd: 50, inr: 4800 };
+  const symbols = { usd: '$', inr: '₹' };
+  const format = (value) => Number(value).toLocaleString('en-IN');
+  const updateBuilder = () => {
+    const active = $('.business.active', builder) || $('.business', builder);
+    const base = Number(active?.dataset[currency === 'usd' ? 'baseUsd' : 'baseInr'] || 0);
+    const selected = $$('.feature-list input:checked', builder).length;
+    const total = base + selected * featurePrices[currency];
+    $$('[data-price="base"]', builder).forEach((el) => el.textContent = `${symbols[currency]}${format(base)}`);
+    $$('[data-price="feature"]', builder).forEach((el) => el.textContent = `+${symbols[currency]}${format(featurePrices[currency])}`);
+    const totalEl = $('#estimateTotal', builder);
+    if (totalEl) totalEl.textContent = currency === 'usd' ? `$${format(total)} USD` : `₹${format(total)} INR`;
+  };
+  $$('.currency-toggle button', builder).forEach((button) => button.addEventListener('click', () => {
+    currency = button.dataset.currency;
+    $$('.currency-toggle button', builder).forEach((b) => b.classList.toggle('active', b === button));
+    updateBuilder();
+  }));
+  $$('.business', builder).forEach((button) => button.addEventListener('click', () => {
+    $$('.business', builder).forEach((b) => b.classList.remove('active'));
+    button.classList.add('active'); updateBuilder();
+  }));
+  $$('.feature-list input', builder).forEach((input) => input.addEventListener('change', updateBuilder));
+  updateBuilder();
+}
+
+// Contact success confirmation modal.
+const successModal = $('#successModal');
+if (successModal) {
+  const closeSuccess = () => { successModal.classList.remove('show'); successModal.setAttribute('aria-hidden','true'); };
+  $('.success-close', successModal)?.addEventListener('click', closeSuccess);
+  successModal.addEventListener('click', (e) => { if (e.target === successModal) closeSuccess(); });
+}
