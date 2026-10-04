@@ -145,3 +145,43 @@ body:before{background-image:radial-gradient(circle,rgba(255,122,26,.12) 1px,tra
 .topbar .top-contact a:hover span{
   color:#ff6b00 !important;
 }
+
+/* V9: contact label visibility, single-person team layout, delayed home contact popup */
+.visible-labels .field label{
+  display:block;
+  margin:0 0 7px;
+  color:#2c1d14 !important;
+  font-weight:800;
+  font-size:13px;
+  letter-spacing:.35px;
+}
+.visible-labels .field label::first-letter{color:#ff6b00}
+.people:has(.owner-card:only-child){grid-template-columns:minmax(280px,680px);justify-content:center}
+.core-team:has(.core-person:only-child){grid-template-columns:minmax(280px,520px);justify-content:center}
+.contact-popup{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:24px;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .35s ease,visibility .35s ease}
+.contact-popup.show{opacity:1;visibility:visible;pointer-events:auto}
+.contact-popup-backdrop{position:absolute;inset:0;background:rgba(18,10,5,.64);backdrop-filter:blur(10px)}
+.contact-popup-card{position:relative;z-index:1;width:min(650px,calc(100vw - 30px));max-height:90vh;overflow:auto;border-radius:30px;background:#fffaf6;border:1px solid rgba(255,122,26,.28);box-shadow:0 35px 100px rgba(38,17,4,.32);padding:22px;transform:translateY(26px) scale(.97);transition:transform .4s cubic-bezier(.2,.8,.2,1)}
+.contact-popup.show .contact-popup-card{transform:none}
+.contact-popup-close{position:sticky;float:right;top:0;z-index:5;width:42px;height:42px;border:0;border-radius:50%;background:#ff7a1a;color:#fff;font-size:28px;line-height:1;cursor:pointer;box-shadow:0 8px 22px rgba(255,122,26,.25)}
+.contact-popup-kicker{color:#ff6b00;font-size:11px;font-weight:900;letter-spacing:2px;margin:6px 54px 8px 6px}
+.contact-popup .hero-form{animation:none;background:linear-gradient(145deg,#fffaf6,#fff0e4);border:1px solid rgba(255,122,26,.2);box-shadow:none;color:#2c1d14;padding:24px}
+.contact-popup .hero-form h3{color:#2c1d14}
+.contact-popup .field input,.contact-popup .field textarea,.contact-popup .field select{background:#fff;color:#2c1d14;border-color:rgba(117,72,43,.22)}
+.contact-popup .field input::placeholder,.contact-popup .field textarea::placeholder{color:#9a8375}
+.contact-popup .form-note{color:#725b4d}
+body.popup-open{overflow:hidden}
+@media(max-width:800px){.contact-popup{padding:10px}.contact-popup-card{width:100%;max-height:94vh;padding:12px;border-radius:22px}.contact-popup .hero-form{padding:18px}.people:has(.owner-card:only-child),.core-team:has(.core-person:only-child){grid-template-columns:1fr}}
+
+
+/* V10: Services mobile spacing fix */
+@media(max-width:560px){
+  .services-page .pagehero{padding-top:48px;padding-bottom:34px;min-height:0}
+  .services-page .pagehero h1{font-size:clamp(38px,12vw,54px);line-height:1.02;margin:10px 0 14px}
+  .services-page .pagehero p{margin:0}
+  .services-page .pagehero + .section{padding-top:42px}
+  .services-page .pagehero + .section .section-head{margin-bottom:26px}
+  .services-page .pagehero + .section .section-head h2{font-size:34px;line-height:1.08;margin:8px 0 12px}
+  .services-page .pagehero.reveal,
+  .services-page .pagehero + .section.reveal{opacity:1;transform:none}
+}

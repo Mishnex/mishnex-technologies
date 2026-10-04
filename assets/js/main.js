@@ -225,3 +225,25 @@ if (successModal) {
   $('.success-close', successModal)?.addEventListener('click', closeSuccess);
   successModal.addEventListener('click', (e) => { if (e.target === successModal) closeSuccess(); });
 }
+
+// Home page: show the contact form automatically after 10 seconds.
+(() => {
+  const popup = document.getElementById('contactPopup');
+  if (!popup) return;
+  const openPopup = () => {
+    popup.classList.add('show');
+    popup.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('popup-open');
+  };
+  const closePopup = () => {
+    popup.classList.remove('show');
+    popup.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('popup-open');
+  };
+  const timer = window.setTimeout(openPopup, 10000);
+  popup.querySelectorAll('[data-popup-close]').forEach((el) => el.addEventListener('click', closePopup));
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && popup.classList.contains('show')) closePopup();
+  });
+  window.addEventListener('beforeunload', () => window.clearTimeout(timer));
+})();
