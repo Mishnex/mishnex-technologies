@@ -38,8 +38,10 @@ export function leadWorkflowRoutes({ pool, requireOwner }) {
         await client.query('ROLLBACK');
         return res.status(409).json({ error: 'Lead status transition is not allowed.' });
       }
-      await client.query('UPDATE public.crm_leads SET status=$2 WHERE id=$1',
-        [leadId.data, parsed.data.status]);
+      if (from !== parsed.data.status) {
+        await client.query('UPDATE public.crm_leads SET status=$2 WHERE id=$1',
+          [leadId.data, parsed.data.status]);
+      }
       await client.query(
         'INSERT INTO public.crm_lead_activity(lead_id,actor_id,from_status,to_status,note) VALUES ($1,$2,$3,$4,$5)',
         [leadId.data, req.owner.id, from, parsed.data.status, parsed.data.note ?? null]
