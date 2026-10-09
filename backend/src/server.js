@@ -93,8 +93,14 @@ app.post('/api/admin/password-recovery', recoveryLimiter, async (req, res, next)
       method: 'POST', headers: { apikey: process.env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }), signal: AbortSignal.timeout(8000)
     });
-    if (!response.ok) console.error('Supabase recovery request failed:', response.status);
-    res.json({ message: 'If this is the Owner account, a recovery email will be sent.' });
+    if (response.status === 429) {
+      return res.status(429).json({ error: 'Supabase email limit reached. Wait for the email quota to reset before trying again.' });
+    }
+    if (!response.ok) {
+      console.error('Supabase recovery request failed:', response.status);
+      return res.status(502).json({ error: 'Recovery email could not be sent. Please try again later.' });
+    }
+    return res.json({ message: 'Recovery request accepted. Check your inbox and spam folder.' });
   } catch (error) { next(error); }
 });
 
