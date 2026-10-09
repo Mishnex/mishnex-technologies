@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
@@ -13,6 +13,7 @@ export function staffRoutes({ pool, requireOwner }) {
     role: z.enum(['super_admin','manager','sales','developer','accountant'])
   }).strict();
   const uuidSchema = z.string().uuid();
+  const fingerprint = token => createHash('sha256').update(token).digest('hex');
   const secret = () => randomBytes(24).toString('base64url') + 'aA1!';
   const configured = () => Boolean(process.env.STAFF_MANAGEMENT_ENABLED === 'true' && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
   async function adminApi(path, method, body) {
@@ -78,6 +79,14 @@ export function staffRoutes({ pool, requireOwner }) {
       if (!staff.rowCount || !staff.rows[0].is_active) return res.status(403).json({ error:'Staff access denied.' });
       const account = staff.rows[0];
       if (!tokenIssuedAfterCutoff(data.access_token, account.sessions_valid_after)) return res.status(401).json({ error:'Session revoked. Sign in again.' });
+      if (account.role === 'super_admin' && !account.must_change_password) {
+        const expiresAt = new Date(Date.now() + Math.min(Number(data.expires_in) || 3600, 3600) * 1000);
+        const registered = await pool.query(
+          'select public.crm_register_super_admin_session($1,$2,$3) as allowed',
+          [account.user_id, fingerprint(data.access_token), expiresAt]
+        );
+        if (!registered.rows[0]?.allowed) return res.status(429).json({ error:'Maximum 5 active Super Admin sessions reached.' });
+      }
       res.set('Cache-Control','no-store').json({
         accessToken:data.access_token, expiresIn:data.expires_in,
         role:account.role, mustChangePassword:account.must_change_password,
@@ -101,6 +110,13 @@ export function staffRoutes({ pool, requireOwner }) {
       if (!result.rowCount || !result.rows[0].is_active) return res.status(403).json({ error:'Account disabled or not found.' });
       const staff = result.rows[0];
       if (!tokenIssuedAfterCutoff(match[1],staff.sessions_valid_after)) return res.status(401).json({ error:'Session revoked.' });
+      if (staff.role === 'super_admin' && !staff.must_change_password) {
+        const active = await pool.query(
+          'select 1 from public.crm_super_admin_sessions where user_id=$1 and token_fingerprint=$2 and revoked_at is null and expires_at>now()',
+          [user.id,fingerprint(match[1])]
+        );
+        if (!active.rowCount) return res.status(401).json({ error:'Super Admin session expired or revoked.' });
+      }
       res.set('Cache-Control','no-store').json({
         id:staff.user_id,fullName:staff.full_name,role:staff.role,
         mustChangePassword:staff.must_change_password,permissions:permissionsFor(staff),crmAccessEnabled:false
