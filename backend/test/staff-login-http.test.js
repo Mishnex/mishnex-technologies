@@ -1405,3 +1405,44 @@ test('Owner cannot reset password for inactive employee or mutate Auth sessions'
     }
   }
 });
+
+test('Owner staff mutation routes reject invalid IDs before touching database or Auth', async () => {
+  const names=['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
+  const saved=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  const originalFetch=globalThis.fetch;
+  let server;
+  let providerCalls=0;
+  let databaseCalls=0;
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key'
+    });
+    globalThis.fetch=async()=>{providerCalls++;throw new Error('Unexpected Auth access');};
+    const app=express();
+    app.use('/api/admin/staff',staffRoutes({
+      pool:{
+        query:async()=>{databaseCalls++;throw new Error('Unexpected database query');},
+        connect:async()=>{databaseCalls++;throw new Error('Unexpected database connection');}
+      },
+      requireOwner:(req,_res,next)=>{req.owner={id:'00000000-0000-4000-8000-000000000002'};next();}
+    }));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    for(const action of ['reset-password','deactivate']){
+      const response=await originalFetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff/not-a-uuid/'+action,{method:'POST'});
+      assert.equal(response.status,400);
+      assert.equal((await response.json()).error,'Invalid staff ID.');
+    }
+    assert.equal(providerCalls,0);
+    assert.equal(databaseCalls,0);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    globalThis.fetch=originalFetch;
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
