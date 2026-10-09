@@ -61,3 +61,5 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 - Lead follow-up history and status-save UI now ignore stale responses from an earlier Owner session; browser race tests remain pending.
 
 - Fixed Owner dashboard navigation wiring: CRM Leads menu now invokes lead loading and hides unrelated module panels. Browser smoke test remains pending.
+
+- CRM Leads filter now uses request sequencing so an older HTTP response cannot overwrite newer filtered results; browser race testing remains pending.
