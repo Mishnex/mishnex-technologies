@@ -123,6 +123,25 @@ export function staffRoutes({ pool, requireOwner }) {
       });
     } catch (error) { next(error); }
   });
+  // Explicit Super Admin logout invalidates the registered access-token fingerprint.
+  router.post('/logout', async (req, res, next) => {
+    if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error:'Staff access is disabled.' });
+    const match = /^Bearer (\S+)$/.exec(req.get('Authorization') || '');
+    if (!match) return res.status(401).json({ error:'Authentication required.' });
+    try {
+      const response = await fetch(new URL('/auth/v1/user', process.env.SUPABASE_URL), {
+        headers:{ apikey:process.env.SUPABASE_ANON_KEY, Authorization:'Bearer ' + match[1] },
+        signal:AbortSignal.timeout(8000)
+      });
+      if (!response.ok) return res.status(401).json({ error:'Invalid session.' });
+      const user = await response.json();
+      await pool.query(
+        'update public.crm_super_admin_sessions set revoked_at=now() where user_id=$1 and token_fingerprint=$2 and revoked_at is null',
+        [user.id,fingerprint(match[1])]
+      );
+      res.set('Cache-Control','no-store').json({ signedOut:true });
+    } catch (error) { next(error); }
+  });
   // Self-service first-login password change. Does not grant staff CRM access.
   router.post('/change-password', passwordChangeLimiter, async (req, res, next) => {
     if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error: 'Staff access is not enabled.' });
