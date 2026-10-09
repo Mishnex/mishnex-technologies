@@ -35,3 +35,11 @@ Run in a controlled staging environment with test accounts. Keep STAFF_MANAGEMEN
 - Session cutoff boundary model: 4 passed, 0 failed using Node's built-in test runner in an isolated local environment.
 - This run tests a copy of the regression cases, not the full backend suite or live Supabase integration. The cutoff policy is still duplicated in the test; refactor to test the production helper directly before production activation.
 - Full backend npm test and real staff authentication remain unverified.
+
+## CI verification update (2026-10-09)
+
+- GitHub Actions Run #20 (commit 83be647) completed successfully: https://github.com/Mishnex/mishnex-technologies/actions/runs/37959900058
+- The CI workflow installs backend dependencies and executes `npm test` on the development branch. Session-cutoff tests now import the actual production helper, not a duplicated implementation.
+- HTTP integration-style tests cover disabled login, identity, logout, password-change, leads, and permission-probe routes, including the independent CRM data gate.
+- These checks **do not** constitute real Supabase Auth or PostgreSQL integration tests; all test staff endpoints are feature-disabled.
+- Still required before activation: live TLS connectivity, controlled test accounts, real login/change-password/logout/revocation, Super Admin concurrent-login limit, role-based HTTP 403/200 assertions, audit verification and recovery flows.
