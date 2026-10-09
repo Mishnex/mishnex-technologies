@@ -233,6 +233,42 @@ async function loadLeadPanel(){
       const details=document.createElement('p');
       details.textContent=[lead.email,lead.service,lead.status||'Unknown status'].filter(Boolean).join(' · ');
       item.append(title,details);
+      const historyButton=document.createElement('button');
+      historyButton.type='button';
+      historyButton.textContent='View follow-up history';
+      const history=document.createElement('div');
+      history.hidden=true;
+      historyButton.addEventListener('click',async()=>{
+        if(!history.hidden){history.hidden=true;return;}
+        history.replaceChildren();
+        history.textContent='Loading follow-up history...';
+        history.hidden=false;
+        historyButton.disabled=true;
+        try{
+          const response=await fetch(apiOrigin+'/api/admin/lead-workflow/'+encodeURIComponent(lead.id)+'/activity',{
+            headers:{Authorization:'Bearer '+ownerAccessToken}
+          });
+          if(response.status===401||response.status===403){signOut();return;}
+          const data=await response.json().catch(()=>({}));
+          if(response.status===503){
+            history.textContent='Follow-up history is not enabled yet. Existing leads remain available.';
+          }else if(!response.ok){
+            history.textContent=data.error||'Unable to load follow-up history.';
+          }else{
+            history.replaceChildren();
+            const records=Array.isArray(data.activity)?data.activity:[];
+            if(!records.length)history.textContent='No follow-up history yet.';
+            for(const record of records){
+              const entry=document.createElement('p');
+              const timestamp=record.created_at?new Date(record.created_at).toLocaleString():'';
+              entry.textContent=[timestamp,record.from_status+' → '+record.to_status,record.note].filter(Boolean).join(' · ');
+              history.appendChild(entry);
+            }
+          }
+        }catch(error){history.textContent='Unable to load follow-up history.';}
+        finally{historyButton.disabled=false;}
+      });
+      item.append(historyButton,history);
       leadResults.appendChild(item);
     }
   }catch(error){leadFeedback.textContent=error.message||'Unable to load enquiries.';}
