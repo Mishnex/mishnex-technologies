@@ -176,10 +176,7 @@ export function staffRoutes({ pool, requireOwner }) {
       });
       if (!response.ok) return res.status(401).json({ error:'Invalid session.' });
       const user = await response.json();
-      await pool.query(
-        'update public.crm_super_admin_sessions set revoked_at=now() where user_id=$1 and token_fingerprint=$2 and revoked_at is null',
-        [user.id,fingerprint(match[1])]
-      );
+      await pool.query('select public.crm_revoke_staff_sessions_on_logout($1)', [user.id]);
       // Global sign-out revokes provider refresh sessions across devices.
       const logoutResponse = await fetch(new URL('/auth/v1/logout?scope=global', process.env.SUPABASE_URL), {
         method:'POST',
