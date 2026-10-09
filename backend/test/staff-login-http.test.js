@@ -507,3 +507,65 @@ test('staff password change revokes sessions before provider update and requires
     }
   }
 });
+
+test('staff password change returns recovery guidance if provider update fails after revocation', async () => {
+  const names=['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SUPABASE_ANON_KEY'];
+  const saved=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  const originalFetch=globalThis.fetch;
+  const originalError=console.error;
+  let server;
+  const events=[];
+  const issued=Math.floor(Date.now()/1000)-5;
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key',
+      SUPABASE_ANON_KEY:'fake-test-only-anon-key'
+    });
+    console.error=()=>{};
+    globalThis.fetch=async url=>{
+      if(String(url).includes('/auth/v1/admin/')){
+        events.push('provider-password-update-failed');
+        return {ok:false,status:503,json:async()=>({})};
+      }
+      events.push('provider-user');
+      return {ok:true,json:async()=>({id:'00000000-0000-4000-8000-000000000001'})};
+    };
+    const pool={query:async sql=>{
+      if(sql.includes('crm_begin_staff_password_change')){
+        events.push('database-begin-revocation');
+        return {rowCount:1,rows:[{}]};
+      }
+      if(sql.includes('crm_complete_staff_password_change')){
+        events.push('unexpected-database-completion');
+      }
+      return {rowCount:1,rows:[{
+        is_active:true,sessions_valid_after:new Date((issued-5)*1000).toISOString()
+      }]};
+    }};
+    const app=express();
+    app.use(express.json());
+    app.use('/api/admin/staff',staffRoutes({pool,requireOwner:(_req,res)=>res.sendStatus(403)}));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await originalFetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff/change-password',{
+      method:'POST',headers:{authorization:'Bearer '+jwt(issued),'content-type':'application/json'},
+      body:JSON.stringify({newPassword:'test-only-long-password-123!'})
+    });
+    assert.equal(response.status,503);
+    assert.equal(response.headers.get('cache-control'),'no-store');
+    const body=await response.json();
+    assert.equal(body.changed,false);
+    assert.match(body.error,/Contact the Owner to reset your password/);
+    assert.deepEqual(events,['provider-user','database-begin-revocation','provider-password-update-failed']);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    globalThis.fetch=originalFetch;
+    console.error=originalError;
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
