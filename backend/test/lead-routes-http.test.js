@@ -115,3 +115,10 @@ test('same-status follow-up saves activity without redundant lead update',async(
   assert.deepEqual(result.calls.map(call=>call.sql.split(' ')[0]),['BEGIN','SELECT','INSERT','COMMIT']);
   assert.deepEqual(result.calls[2].params,[leadId,ownerId,'new','new','Called; awaiting reply']);
 });
+
+test('same-status update without note is rejected without activity insert',async()=>{
+  const result=await request({enabled:true,body:{status:'new'}});
+  assert.equal(result.status,400);
+  assert.match(result.json.error,/follow-up note is required/i);
+  assert.deepEqual(result.calls.map(call=>call.sql.split(' ')[0]),['BEGIN','SELECT','ROLLBACK']);
+});
