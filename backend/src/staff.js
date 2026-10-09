@@ -208,8 +208,16 @@ export function staffRoutes({ pool, requireOwner }) {
       if (!tokenIssuedAfterCutoff(match[1], staff.rows[0].sessions_valid_after)) return res.status(401).json({ error:'Session revoked. Sign in again.' });
       // Re-check active staff state and mark sessions invalid before changing Auth credentials.
       await pool.query('select public.crm_begin_staff_password_change($1)', [user.id]);
-      await adminApi('users/' + encodeURIComponent(user.id), 'PUT', { password: parsed.data.newPassword });
-      await pool.query('select public.crm_complete_staff_password_change($1)', [user.id]);
+      try {
+        await adminApi('users/' + encodeURIComponent(user.id), 'PUT', { password: parsed.data.newPassword });
+        await pool.query('select public.crm_complete_staff_password_change($1)', [user.id]);
+      } catch (error) {
+        console.error('Staff password change requires recovery', { userId: user.id, message: error.message });
+        return res.status(503).set('Cache-Control', 'no-store').json({
+          changed: false,
+          error: 'Password change could not be confirmed. Existing sessions were revoked. Contact the Owner to reset your password.'
+        });
+      }
       res.set('Cache-Control', 'no-store').json({ changed: true, message: 'Password updated. Sign in again.' });
     } catch (error) { next(error); }
   });
