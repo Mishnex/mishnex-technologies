@@ -27,8 +27,8 @@ export function leadWorkflowRoutes({ pool, requireOwner }) {
     let connectionBroken = false;
     try {
       client = await pool.connect();
-      await client.query('BEGIN');
       transactionOpen = true;
+      await client.query('BEGIN');
       const current = await client.query(
         'SELECT status FROM public.crm_leads WHERE id=$1 FOR UPDATE',
         [leadId.data]
