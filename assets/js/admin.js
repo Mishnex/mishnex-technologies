@@ -145,14 +145,17 @@ async function loadStaffPanel() {
         reset.textContent = 'Reset password';
         reset.addEventListener('click', async () => {
           if (!confirm('Generate a new temporary password for ' + member.email + '?')) return;
+          const requestToken = ownerAccessToken;
+          if (!requestToken) return;
           reset.disabled = true;
           credentialBox.hidden = true;
           try {
             const result = await staffRequest('/' + encodeURIComponent(member.user_id) + '/reset-password', { method:'POST' });
+            if (requestToken !== ownerAccessToken) return;
             credentialValue.textContent = result.temporaryPassword;
             credentialBox.hidden = false;
             staffStatus.textContent = result.warning;
-          } catch (error) { staffStatus.textContent = error.message; }
+          } catch (error) { if (requestToken === ownerAccessToken) staffStatus.textContent = error.message; }
           finally { reset.disabled = false; }
         });
         row.appendChild(reset);
@@ -162,14 +165,18 @@ async function loadStaffPanel() {
         deactivate.setAttribute('aria-label', 'Deactivate ' + member.full_name);
         deactivate.addEventListener('click', async () => {
           if (!confirm('Deactivate ' + member.full_name + '? They will lose staff access.')) return;
+          const requestToken = ownerAccessToken;
+          if (!requestToken) return;
           deactivate.disabled = true;
           credentialBox.hidden = true;
           credentialValue.textContent = '';
           try {
             await staffRequest('/' + encodeURIComponent(member.user_id) + '/deactivate', { method:'POST' });
+            if (requestToken !== ownerAccessToken) return;
             await loadStaffPanel();
+            if (requestToken !== ownerAccessToken) return;
             staffStatus.textContent = 'Employee deactivated.';
-          } catch (error) { staffStatus.textContent = error.message; }
+          } catch (error) { if (requestToken === ownerAccessToken) staffStatus.textContent = error.message; }
           finally { deactivate.disabled = false; }
         });
         row.appendChild(deactivate);
@@ -180,6 +187,8 @@ async function loadStaffPanel() {
 }
 staffForm.addEventListener('submit', async event => {
   event.preventDefault();
+  const requestToken = ownerAccessToken;
+  if (!requestToken) return;
   const submit = staffForm.querySelector('button[type="submit"]');
   submit.disabled = true;
   credentialBox.hidden = true;
@@ -187,12 +196,14 @@ staffForm.addEventListener('submit', async event => {
   try {
     const fields = new FormData(staffForm);
     const result = await staffRequest('/', { method:'POST', body:JSON.stringify(Object.fromEntries(fields)) });
+    if (requestToken !== ownerAccessToken) return;
     staffForm.reset();
     await loadStaffPanel();
+    if (requestToken !== ownerAccessToken) return;
     credentialValue.textContent = result.temporaryPassword;
     credentialBox.hidden = false;
     staffStatus.textContent = result.warning;
-  } catch (error) { staffStatus.textContent = error.message; }
+  } catch (error) { if (requestToken === ownerAccessToken) staffStatus.textContent = error.message; }
   finally { submit.disabled = false; }
 });
 
