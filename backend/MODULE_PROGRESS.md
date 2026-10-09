@@ -55,3 +55,5 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 
 ## Owner dashboard session privacy
 - Sign-out clears loaded lead/staff data and stale lead-list responses are ignored after token changes. Browser-level race-condition testing remains pending.
+
+- Additional dashboard session guard: stale 401/403 lead responses cannot sign out a newer Owner session, and stale staff-list results cannot repopulate the UI. Browser race tests still pending.
