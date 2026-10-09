@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { leadSchema } from './validation.js';
 import { staffRoutes } from './staff.js';
 import { leadWorkflowRoutes } from './lead-routes.js';
+import { leadStatusSchema } from './lead-workflow.js';
 
 const { Pool } = pg;
 const app = express();
@@ -167,10 +168,16 @@ app.get('/api/admin/me', requireOwner, (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({ id: req.owner.id, email: req.owner.email, role: 'owner' });
 });
-app.get('/api/admin/leads', requireOwner, async (_req, res, next) => {
+app.get('/api/admin/leads', requireOwner, async (req, res, next) => {
+  const rawStatus = req.query.status;
+  if (rawStatus !== undefined && (typeof rawStatus !== 'string' || !leadStatusSchema.safeParse(rawStatus).success)) {
+    return res.status(400).json({ error: 'Invalid lead status filter.' });
+  }
   try {
     const result = await pool.query(
-      'SELECT id, name, email, phone, service, budget, preferred_call_time, requirement, status, created_at FROM public.crm_leads ORDER BY created_at DESC LIMIT 50'
+      'SELECT id, name, email, phone, service, budget, preferred_call_time, requirement, status, created_at FROM public.crm_leads ' +
+      (rawStatus ? 'WHERE status=$1 ' : '') + 'ORDER BY created_at DESC LIMIT 50',
+      rawStatus ? [rawStatus] : []
     );
     res.set('Cache-Control', 'no-store');
     res.json({ leads: result.rows });
