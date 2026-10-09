@@ -1582,7 +1582,9 @@ test('Owner employee creation fails closed when database and Auth cleanup both f
       body:JSON.stringify({email:'staff@example.com',fullName:'Test Employee',role:'sales'})
     });
     assert.equal(response.status,503);
-    assert.equal((await response.json()).temporaryPassword,undefined);
+    const result=await response.json();
+    assert.equal(result.temporaryPassword,undefined);
+    assert.match(result.error,/Do not retry until the account is reconciled/);
     assert.deepEqual(events,['provider-create','database-connect-failed','provider-cleanup-failed']);
   } finally {
     if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
