@@ -59,3 +59,9 @@ test('rejects JWT issued-at values beyond safe integer precision', () => {
   assert.equal(allowed(Number.MAX_SAFE_INTEGER + 1, '1970-01-01T00:00:00Z'), false);
   assert.equal(allowed(Number.MAX_SAFE_INTEGER, '1970-01-01T00:00:00Z'), true);
 });
+
+test('future revocation cutoff denies tokens issued earlier', () => {
+  const cutoff = '2099-01-01T00:00:00.000Z';
+  assert.equal(allowed(1735689600, cutoff), false);
+  assert.equal(allowed(4070908800, cutoff), false);
+});
