@@ -54,3 +54,8 @@ test('JWT issued-at rejects boolean and negative values', () => {
   assert.equal(allowed(true, '1970-01-01T00:00:00Z'), false);
   assert.equal(allowed(-1, '1970-01-01T00:00:00Z'), false);
 });
+
+test('rejects JWT issued-at values beyond safe integer precision', () => {
+  assert.equal(allowed(Number.MAX_SAFE_INTEGER + 1, '1970-01-01T00:00:00Z'), false);
+  assert.equal(allowed(Number.MAX_SAFE_INTEGER, '1970-01-01T00:00:00Z'), true);
+});
