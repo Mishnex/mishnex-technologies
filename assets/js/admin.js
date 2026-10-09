@@ -144,6 +144,23 @@ async function loadStaffPanel() {
           finally { reset.disabled = false; }
         });
         row.appendChild(reset);
+        const deactivate = document.createElement('button');
+        deactivate.type = 'button';
+        deactivate.textContent = 'Deactivate';
+        deactivate.setAttribute('aria-label', 'Deactivate ' + member.full_name);
+        deactivate.addEventListener('click', async () => {
+          if (!confirm('Deactivate ' + member.full_name + '? They will lose staff access.')) return;
+          deactivate.disabled = true;
+          credentialBox.hidden = true;
+          credentialValue.textContent = '';
+          try {
+            await staffRequest('/' + encodeURIComponent(member.user_id) + '/deactivate', { method:'POST' });
+            await loadStaffPanel();
+            staffStatus.textContent = 'Employee deactivated.';
+          } catch (error) { staffStatus.textContent = error.message; }
+          finally { deactivate.disabled = false; }
+        });
+        row.appendChild(deactivate);
       }
       staffList.appendChild(row);
     });
