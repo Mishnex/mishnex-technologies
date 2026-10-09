@@ -87,3 +87,5 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 - CI #350 exposed duplicate rollback attempts on an explicit rollback failure. Lead workflow now marks the connection broken before attempting explicit rollback, prevents a second rollback attempt, and discards failed connections. Awaiting regression CI confirmation.
 
 - Mocked HTTP transaction test now verifies activity INSERT failure prevents COMMIT, triggers ROLLBACK after status UPDATE, and releases a healthy connection for reuse. Real staging PostgreSQL atomicity validation still pending.
+
+- Mocked HTTP regression verifies a missing lead returns 404 after SELECT FOR UPDATE, rolls back without status/activity writes, and releases a healthy DB client. Real staging DB tests remain required.
