@@ -202,12 +202,13 @@ staffForm.addEventListener('submit', async event => {
     const result = await staffRequest('/', { method:'POST', body:JSON.stringify(Object.fromEntries(fields)) });
     if (requestToken !== ownerAccessToken || staffPanel.hidden) return;
     staffForm.reset();
-    await loadStaffPanel();
-    if (requestToken !== ownerAccessToken || staffPanel.hidden) return;
     credentialValue.textContent = result.temporaryPassword;
     credentialBox.hidden = false;
-    staffStatus.textContent = result.warning;
-  } catch (error) { if (requestToken === ownerAccessToken) staffStatus.textContent = error.message; }
+    staffStatus.textContent = result.warning || 'Employee created. Copy the temporary password securely.';
+    await loadStaffPanel();
+    if (requestToken !== ownerAccessToken || staffPanel.hidden) return;
+    staffStatus.textContent = result.warning || 'Employee created. Copy the temporary password securely.';
+  } catch (error) { if (requestToken === ownerAccessToken && !staffPanel.hidden) staffStatus.textContent = error.message; }
   finally { submit.disabled = false; }
 });
 
