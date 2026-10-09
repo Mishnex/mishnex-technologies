@@ -33,3 +33,12 @@ test('rejects a token issued exactly at logout cutoff', () => {
   assert.equal(allowed(200, '1970-01-01T00:03:20.000Z'), false);
   assert.equal(allowed(201, '1970-01-01T00:03:20.000Z'), true);
 });
+
+test('rejects JWTs without all three nonempty segments', () => {
+  const payload = Buffer.from(JSON.stringify({ iat: 102 })).toString('base64url');
+  const cutoff = '1970-01-01T00:01:41.500Z';
+  assert.equal(tokenIssuedAfterCutoff('header.' + payload, cutoff), false);
+  assert.equal(tokenIssuedAfterCutoff('header.' + payload + '.', cutoff), false);
+  assert.equal(tokenIssuedAfterCutoff('.' + payload + '.signature', cutoff), false);
+  assert.equal(tokenIssuedAfterCutoff(null, cutoff), false);
+});
