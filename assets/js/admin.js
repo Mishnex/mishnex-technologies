@@ -252,6 +252,8 @@ async function loadLeadPanel(){
       const history=document.createElement('div');
       history.hidden=true;
       historyButton.addEventListener('click',async()=>{
+        const requestToken=ownerAccessToken;
+        if(!requestToken)return;
         if(!history.hidden){history.hidden=true;return;}
         history.replaceChildren();
         history.textContent='Loading follow-up history...';
@@ -261,8 +263,12 @@ async function loadLeadPanel(){
           const response=await fetch(apiOrigin+'/api/admin/lead-workflow/'+encodeURIComponent(lead.id)+'/activity',{
             headers:{Authorization:'Bearer '+ownerAccessToken}
           });
+          if(requestToken!==ownerAccessToken)return;
+          if(requestToken!==ownerAccessToken)return;
           if(response.status===401||response.status===403){signOut();return;}
           const data=await response.json().catch(()=>({}));
+          if(requestToken!==ownerAccessToken)return;
+          if(requestToken!==ownerAccessToken)return;
           if(response.status===503){
             history.textContent='Follow-up history is not enabled yet. Existing leads remain available.';
           }else if(!response.ok){
@@ -278,7 +284,7 @@ async function loadLeadPanel(){
               history.appendChild(entry);
             }
           }
-        }catch(error){history.textContent='Unable to load follow-up history.';}
+        }catch(error){if(requestToken===ownerAccessToken)history.textContent='Unable to load follow-up history.';}
         finally{historyButton.disabled=false;}
       });
       const updateForm=document.createElement('form');
@@ -326,6 +332,8 @@ async function loadLeadPanel(){
       updateForm.append(statusSelect,noteInput,saveButton,updateFeedback);
       updateForm.addEventListener('submit',async(event)=>{
         event.preventDefault();
+        const requestToken=ownerAccessToken;
+        if(!requestToken)return;
         if(statusSelect.disabled)return;
         saveButton.disabled=true;
         updateFeedback.textContent='Saving...';
@@ -351,7 +359,7 @@ async function loadLeadPanel(){
             noteInput.value='';
             history.hidden=true;
           }
-        }catch(error){updateFeedback.textContent='Unable to save follow-up.';}
+        }catch(error){if(requestToken===ownerAccessToken)updateFeedback.textContent='Unable to save follow-up.';}
         finally{saveButton.disabled=false;}
       });
       item.append(historyButton,history,updateForm);
