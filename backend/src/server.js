@@ -8,6 +8,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { leadSchema } from './validation.js';
 import { staffRoutes } from './staff.js';
+import { leadWorkflowRoutes } from './lead-routes.js';
 
 const { Pool } = pg;
 const app = express();
@@ -28,7 +29,7 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
     return cb(new Error('Origin not allowed'));
   },
-  methods: ['GET', 'POST'],
+  methods: ['GET', 'POST', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
@@ -161,6 +162,7 @@ async function requireOwner(req, res, next) {
   } catch (error) { next(error); }
 }
 app.use('/api/admin/staff', staffRoutes({ pool, requireOwner }));
+app.use('/api/admin/lead-workflow', leadWorkflowRoutes({ pool, requireOwner }));
 app.get('/api/admin/me', requireOwner, (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({ id: req.owner.id, email: req.owner.email, role: 'owner' });
