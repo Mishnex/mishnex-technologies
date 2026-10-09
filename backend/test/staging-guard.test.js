@@ -31,3 +31,20 @@ test('rejects enabled CRM data and missing staging markers', () => {
 test('rejects database hostname mismatch', () => {
   assert.throws(() => assertStagingTarget({ ...valid(), DATABASE_URL: 'postgresql://test:password@other.example.com:5432/test' }));
 });
+
+test('rejects mismatched staging Auth project and insecure protocols', () => {
+  assert.throws(() => assertStagingTarget({
+    ...valid(), STAGING_SUPABASE_PROJECT_ID: 'differentproject'
+  }));
+  assert.throws(() => assertStagingTarget({
+    ...valid(), SUPABASE_URL: 'http://stagingproject.supabase.co'
+  }));
+  assert.throws(() => assertStagingTarget({
+    ...valid(), DATABASE_URL: 'https://staging-db.example.com/test'
+  }));
+});
+
+test('rejects malformed staging URLs before any connection', () => {
+  assert.throws(() => assertStagingTarget({ ...valid(), SUPABASE_URL: 'not-a-url' }));
+  assert.throws(() => assertStagingTarget({ ...valid(), DATABASE_URL: 'not-a-url' }));
+});
