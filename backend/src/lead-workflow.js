@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // Module 2: shared, side-effect-free lead workflow validation.
 // Database and HTTP mutations remain disabled until migration and Owner review.
-export const leadStatuses = Object.freeze(['new','contacted','qualified','proposal','won','lost']);
+export const leadStatuses = Object.freeze(['new','contacted','qualified','proposal','won','lost','closed']);
 export const leadStatusSchema = z.enum(leadStatuses);
 export const leadUpdateSchema = z.object({
   status: leadStatusSchema,
@@ -18,7 +18,8 @@ export function canTransitionLead(from, to) {
     qualified: ['proposal','lost'],
     proposal: ['won','lost'],
     won: [],
-    lost: []
+    lost: [],
+    closed: []
   };
   return transitions[from].includes(to);
 }
