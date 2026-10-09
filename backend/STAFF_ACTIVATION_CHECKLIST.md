@@ -20,3 +20,7 @@ Status: not ready for staff production use. No changes to the public website's m
 - Verify database TLS, Owner authentication, staff account creation, password reset, logout, and role permissions end-to-end.
 - Confirm the five-session cap under concurrent login attempts, logout, expiry, and account deactivation.
 - Keep STAFF_MANAGEMENT_ENABLED=false until all checks pass; do not merge development into main.
+
+## Independent CRM data access gate
+
+`STAFF_CRM_ENABLED` defaults to disabled. Staff permission-protected CRM routes return HTTP 503 unless this flag is explicitly `true`, even if `STAFF_MANAGEMENT_ENABLED=true`. Keep **both flags disabled** in production until staff authentication, logout revocation, RBAC, and integration tests pass. Do not enable CRM data access merely to test account provisioning.
