@@ -4,6 +4,7 @@ import { assertStagingTarget } from '../test-support/staging-guard.js';
 
 const valid = () => ({
   CRM_TEST_TARGET: 'isolated-staging',
+  STAGING_ENVIRONMENT_NAME: 'mishnex-crm-isolated-test',
   STAFF_CRM_ENABLED: 'false',
   SUPABASE_URL: 'https://stagingproject.supabase.co',
   DATABASE_URL: 'postgresql://test:password@staging-db.example.com:5432/test',
