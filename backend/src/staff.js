@@ -30,6 +30,31 @@ export function staffRoutes({ pool, requireOwner }) {
     }
     return data;
   }
+  // Temporary-password login is restricted to password setup; it never grants CRM module access.
+  router.post('/login', async (req, res, next) => {
+    if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error:'Staff login is disabled.' });
+    const parsed = z.object({ email:z.string().email().max(254), password:z.string().min(1).max(1024) }).strict().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error:'Enter valid credentials.' });
+    try {
+      const response = await fetch(new URL('/auth/v1/token?grant_type=password', process.env.SUPABASE_URL), {
+        method:'POST', headers:{ apikey:process.env.SUPABASE_ANON_KEY, 'Content-Type':'application/json' },
+        body:JSON.stringify(parsed.data), signal:AbortSignal.timeout(8000)
+      });
+      if (!response.ok) return res.status(401).json({ error:'Invalid credentials.' });
+      const data = await response.json();
+      const staff = await pool.query(
+        'select user_id,role,is_active,must_change_password,sessions_valid_after from public.crm_staff where user_id=$1',
+        [data.user?.id]
+      );
+      if (!staff.rowCount || !staff.rows[0].is_active) return res.status(403).json({ error:'Staff access denied.' });
+      const account = staff.rows[0];
+      res.set('Cache-Control','no-store').json({
+        accessToken:data.access_token, expiresIn:data.expires_in,
+        role:account.role, mustChangePassword:account.must_change_password,
+        crmAccessEnabled:false
+      });
+    } catch (error) { next(error); }
+  });
   // Self-service first-login password change. Does not grant staff CRM access.
   router.post('/change-password', async (req, res, next) => {
     if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error: 'Staff access is not enabled.' });
@@ -44,10 +69,12 @@ export function staffRoutes({ pool, requireOwner }) {
       });
       if (!response.ok) return res.status(401).json({ error: 'Invalid or expired session.' });
       const user = await response.json();
-      const staff = await pool.query('select is_active from public.crm_staff where user_id=$1', [user.id]);
+      const staff = await pool.query('select is_active,sessions_valid_after from public.crm_staff where user_id=$1', [user.id]);
       if (!staff.rowCount || !staff.rows[0].is_active) return res.status(403).json({ error: 'Active staff account required.' });
+      const tokenBody = JSON.parse(Buffer.from(match[1].split('.')[1], 'base64url').toString('utf8'));
+      if (!Number.isFinite(tokenBody.iat) || tokenBody.iat * 1000 < new Date(staff.rows[0].sessions_valid_after).getTime()) return res.status(401).json({ error:'Session revoked. Sign in again.' });
       await adminApi('users/' + encodeURIComponent(user.id), 'PUT', { password: parsed.data });
-      await pool.query('update public.crm_staff set must_change_password=false, updated_at=now() where user_id=$1', [user.id]);
+      await pool.query('update public.crm_staff set must_change_password=false, sessions_valid_after=now(), updated_at=now() where user_id=$1', [user.id]);
       res.set('Cache-Control', 'no-store').json({ changed: true, message: 'Password updated. Sign in again.' });
     } catch (error) { next(error); }
   });
@@ -113,12 +140,12 @@ export function staffRoutes({ pool, requireOwner }) {
       if (!result.rowCount) return res.status(404).json({ error:'Active staff member not found.' });
       const password = secret();
       await adminApi('users/' + encodeURIComponent(id), 'PUT', { password });
-      await pool.query('update public.crm_staff set must_change_password=true,updated_at=now() where user_id=$1',[id]);
+      await pool.query('update public.crm_staff set must_change_password=true,sessions_valid_after=now(),updated_at=now() where user_id=$1',[id]);
       await pool.query(
         "insert into public.crm_staff_audit(actor_id,target_id,action,detail) values ($1,$2,'staff_password_reset',$3)",
         [req.owner.id,id,JSON.stringify({ method:'owner_manual' })]
       );
-      res.set('Cache-Control','no-store').json({ temporaryPassword:password, warning:'Copy securely. Existing sessions must be revoked before enabling staff login.' });
+      res.set('Cache-Control','no-store').json({ temporaryPassword:password, warning:'Copy securely. Old CRM sessions are not accepted by future session-cutoff-aware authorization middleware.' });
     } catch (error) { next(error); }
   });
   return router;
