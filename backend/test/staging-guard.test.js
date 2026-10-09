@@ -69,3 +69,12 @@ test('rejects database connection strings that override TLS settings', () => {
     }), suffix);
   }
 });
+
+test('rejects production Supabase database host even if staging host matches', () => {
+  const productionHost = 'db.wgvqbxgeezrurvnownsd.supabase.co';
+  assert.throws(() => assertStagingTarget({
+    ...valid(),
+    DATABASE_URL: 'postgresql://test:password@' + productionHost + ':5432/postgres',
+    STAGING_DATABASE_HOST: productionHost
+  }), /Production database host forbidden/);
+});
