@@ -13,7 +13,7 @@ export function staffRoutes({ pool, requireOwner }) {
   }).strict();
   const uuidSchema = z.string().uuid();
   const secret = () => randomBytes(24).toString('base64url') + 'aA1!';
-  const configured = () => Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const configured = () => Boolean(process.env.STAFF_MANAGEMENT_ENABLED === 'true' && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
   async function adminApi(path, method, body) {
     const response = await fetch(new URL('/auth/v1/admin/' + path, process.env.SUPABASE_URL), {
       method, headers: {
