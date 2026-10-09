@@ -95,6 +95,16 @@ export function staffRoutes({ pool, requireOwner }) {
   router.get('/permissions/check/leads', (req,res,next) => requireStaffPermission('leads:read',req,res,next), (_req,res) => {
     res.set('Cache-Control','no-store').json({ allowed:true, permission:'leads:read', crmAccessEnabled:false });
   });
+  // A safe, read-only overview for staff with explicit lead read permission.
+  // Owner-only lead management endpoints remain unchanged.
+  router.get('/leads', (req,res,next) => requireStaffPermission('leads:read',req,res,next), async (_req,res,next) => {
+    try {
+      const result = await pool.query(
+        'select id,name,email,service,created_at from public.crm_leads order by created_at desc limit 50'
+      );
+      res.set('Cache-Control','no-store').json({ leads:result.rows });
+    } catch(error) { next(error); }
+  });
   // Temporary-password login is restricted to password setup; it never grants CRM module access.
   router.post('/login', staffLoginLimiter, async (req, res, next) => {
     if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error:'Staff login is disabled.' });
