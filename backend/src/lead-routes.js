@@ -23,15 +23,19 @@ export function leadWorkflowRoutes({ pool, requireOwner }) {
     }
     let client;
     let commitAttempted = false;
+    let transactionOpen = false;
+    let connectionBroken = false;
     try {
       client = await pool.connect();
       await client.query('BEGIN');
+      transactionOpen = true;
       const current = await client.query(
         'SELECT status FROM public.crm_leads WHERE id=$1 FOR UPDATE',
         [leadId.data]
       );
       if (!current.rowCount) {
         await client.query('ROLLBACK');
+        transactionOpen = false;
         return res.status(404).json({ error: 'Lead not found.' });
       }
       const from = current.rows[0].status;
@@ -53,19 +57,22 @@ export function leadWorkflowRoutes({ pool, requireOwner }) {
       );
       commitAttempted = true;
       await client.query('COMMIT');
+      transactionOpen = false;
       return res.json({ leadId:leadId.data, fromStatus:from, status:parsed.data.status });
     } catch (error) {
-      if (client) {
-        try { await client.query('ROLLBACK'); } catch (rollbackError) {
+      if (client && transactionOpen && !commitAttempted) {
+        try { await client.query('ROLLBACK'); transactionOpen = false; } catch (rollbackError) {
+          connectionBroken = true;
           console.error('Lead status rollback failed:', rollbackError.message);
         }
       }
+      if (commitAttempted) connectionBroken = true;
       if (commitAttempted) return res.status(503).json({
         error: 'Lead update outcome is uncertain. Refresh the lead and its activity history before attempting another update.'
       });
       next(error);
     } finally {
-      client?.release();
+      client?.release(connectionBroken || transactionOpen);
     }
   });
   router.get('/:leadId/activity', async (req, res, next) => {
