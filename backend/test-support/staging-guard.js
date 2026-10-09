@@ -10,10 +10,13 @@ export function assertStagingTarget(env) {
     throw new Error('Expected HTTPS Auth and PostgreSQL connection');
   }
   if (auth.hostname === 'wgvqbxgeezrurvnownsd.supabase.co') throw new Error('Production Supabase project forbidden');
-  if (env.STAGING_SUPABASE_PROJECT_ID && !auth.hostname.startsWith(env.STAGING_SUPABASE_PROJECT_ID + '.')) {
+  if (env.STAGING_SUPABASE_PROJECT_ID && auth.hostname !== env.STAGING_SUPABASE_PROJECT_ID + '.supabase.co') {
     throw new Error('Staging Supabase project mismatch');
   }
   if (!env.STAGING_SUPABASE_PROJECT_ID) throw new Error('Explicit staging Supabase project ID required');
+  if (auth.username || auth.password || auth.port || auth.pathname !== '/' || auth.search || auth.hash) {
+    throw new Error('Staging Auth URL must be a clean Supabase project origin');
+  }
   if (env.STAGING_ENVIRONMENT_NAME !== 'mishnex-crm-isolated-test') {
     throw new Error('Explicit isolated staging environment identity required');
   }
