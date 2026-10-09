@@ -5,7 +5,7 @@ import { permissionsFor as sharedPermissionsFor } from './staff-permissions.js';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 
-// All routes are Owner-only until staff RBAC and session enforcement are implemented.
+// Owner-only management routes and separately gated staff auth/CRM routes share this router.
 // Supabase service-role credentials MUST only exist in Render server environment.
 export function staffRoutes({ pool, requireOwner }) {
   const router = Router();
@@ -15,7 +15,7 @@ export function staffRoutes({ pool, requireOwner }) {
     next();
   });
   const staffSchema = z.object({
-    email: z.string().email().max(254).transform(v => v.trim().toLowerCase()),
+    email: z.string().trim().email().max(254).transform(v => v.toLowerCase()),
     fullName: z.string().trim().min(2).max(120),
     role: z.enum(['super_admin','manager','sales','developer','accountant'])
   }).strict();
