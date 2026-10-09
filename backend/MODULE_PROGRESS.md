@@ -49,3 +49,6 @@ Implemented in development:
 - [ ] Verify live site and security after deployment
 
 Percentages discussed previously are planning estimates, **not** evidence of completed integration tests.
+
+## Latest reliability safeguard
+- Employee provisioning no longer deletes the Auth identity after a database COMMIT attempt with an uncertain result. Manual reconciliation and real database failure-path tests are still required.
