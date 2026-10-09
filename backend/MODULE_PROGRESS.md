@@ -81,3 +81,5 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 - Lead status save callbacks now ignore results when their card is no longer visible/current after refresh or navigation. Browser regression test remains pending.
 
 - Staff creation now displays the one-time password immediately after successful provisioning, before refreshing the staff list; a failed refresh cannot prevent first display. Browser regression test pending.
+
+- Lead workflow HTTP regression now covers invalid payloads before DB acquisition, Owner-only ordered history, and discarding connections after failed rollback. Mocked tests do not replace isolated staging PostgreSQL tests.
