@@ -206,6 +206,8 @@ export function staffRoutes({ pool, requireOwner }) {
       const staff = await pool.query('select is_active,sessions_valid_after from public.crm_staff where user_id=$1', [user.id]);
       if (!staff.rowCount || !staff.rows[0].is_active) return res.status(403).json({ error: 'Active staff account required.' });
       if (!tokenIssuedAfterCutoff(match[1], staff.rows[0].sessions_valid_after)) return res.status(401).json({ error:'Session revoked. Sign in again.' });
+      // Re-check active staff state and mark sessions invalid before changing Auth credentials.
+      await pool.query('select public.crm_begin_staff_password_change($1)', [user.id]);
       await adminApi('users/' + encodeURIComponent(user.id), 'PUT', { password: parsed.data });
       await pool.query('select public.crm_complete_staff_password_change($1)', [user.id]);
       res.set('Cache-Control', 'no-store').json({ changed: true, message: 'Password updated. Sign in again.' });
