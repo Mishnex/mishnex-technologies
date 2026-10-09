@@ -227,3 +227,39 @@ test('non-owner cannot read lead activity or trigger database queries',async()=>
     else process.env.LEAD_WORKFLOW_ENABLED=previous;
   }
 });
+
+test('lead transaction rollback failure discards broken PostgreSQL connection',async()=>{
+  const previous=process.env.LEAD_WORKFLOW_ENABLED;
+  process.env.LEAD_WORKFLOW_ENABLED='true';
+  const calls=[],releases=[];
+  const client={
+    query:async sql=>{
+      calls.push(sql);
+      if(sql.startsWith('SELECT status'))return {rowCount:1,rows:[{status:'new'}]};
+      if(sql==='ROLLBACK')throw new Error('connection lost during rollback');
+      return {rowCount:1,rows:[]};
+    },
+    release:broken=>releases.push(broken)
+  };
+  const app=express();
+  app.use(express.json());
+  app.use('/api/admin/lead-workflow',leadWorkflowRoutes({
+    pool:{connect:async()=>client},
+    requireOwner:(req,_res,next)=>{req.owner={id:ownerId};next();}
+  }));
+  app.use((_error,_req,res,_next)=>res.status(500).json({error:'Internal server error'}));
+  const server=app.listen(0,'127.0.0.1');
+  try{
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/lead-workflow/'+leadId+'/status',{
+      method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({status:'won'})
+    });
+    assert.equal(response.status,500);
+    assert.deepEqual(calls.map(sql=>sql.split(' ')[0]),['BEGIN','SELECT','ROLLBACK']);
+    assert.deepEqual(releases,[true],'failed rollback must discard the client');
+  }finally{
+    await new Promise(resolve=>server.close(resolve));
+    if(previous===undefined)delete process.env.LEAD_WORKFLOW_ENABLED;
+    else process.env.LEAD_WORKFLOW_ENABLED=previous;
+  }
+});
