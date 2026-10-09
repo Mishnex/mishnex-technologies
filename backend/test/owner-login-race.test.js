@@ -129,7 +129,7 @@ test('sign-out resets disabled login and invalidates an outstanding login respon
   assert.equal(submit.disabled,true);
   vm.runInContext('signOut()',context);
   assert.equal(submit.disabled,false,'logout should leave login form usable');
-  assert.equal(credentialValue.textContent,'','logout clears temporary credentials');
+  assert.equal(context.credentialValue.textContent,'','logout clears temporary credentials');
   resolveFetch({ok:true,json:async()=>({accessToken:'expired-login-response'})});
   await pending;
   assert.equal(context.ownerAccessToken,null,'late response must not restore a logged-out session');
