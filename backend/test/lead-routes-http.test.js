@@ -122,3 +122,38 @@ test('same-status update without note is rejected without activity insert',async
   assert.match(result.json.error,/follow-up note is required/i);
   assert.deepEqual(result.calls.map(call=>call.sql.split(' ')[0]),['BEGIN','SELECT','ROLLBACK']);
 });
+
+test('lead COMMIT acknowledgement failure returns uncertain outcome instead of claiming rollback',async()=>{
+  const previous=process.env.LEAD_WORKFLOW_ENABLED;
+  process.env.LEAD_WORKFLOW_ENABLED='true';
+  const calls=[];
+  const client={
+    query:async sql=>{
+      calls.push(sql);
+      if(sql.startsWith('SELECT status'))return {rowCount:1,rows:[{status:'new'}]};
+      if(sql==='COMMIT')throw new Error('commit acknowledgement lost');
+      return {rowCount:1,rows:[]};
+    },
+    release:()=>{}
+  };
+  const app=express();
+  app.use(express.json());
+  app.use('/api/admin/lead-workflow',leadWorkflowRoutes({
+    pool:{connect:async()=>client},
+    requireOwner:(req,_res,next)=>{req.owner={id:ownerId};next();}
+  }));
+  const server=app.listen(0,'127.0.0.1');
+  try{
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/lead-workflow/'+leadId+'/status',{
+      method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({status:'contacted',note:'Called'})
+    });
+    assert.equal(response.status,503);
+    assert.match((await response.json()).error,/outcome is uncertain/i);
+    assert.equal(calls.filter(sql=>sql==='COMMIT').length,1);
+  }finally{
+    await new Promise(resolve=>server.close(resolve));
+    if(previous===undefined)delete process.env.LEAD_WORKFLOW_ENABLED;
+    else process.env.LEAD_WORKFLOW_ENABLED=previous;
+  }
+});
