@@ -85,3 +85,5 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 - Lead workflow HTTP regression now covers invalid payloads before DB acquisition, Owner-only ordered history, and discarding connections after failed rollback. Mocked tests do not replace isolated staging PostgreSQL tests.
 
 - CI #350 exposed duplicate rollback attempts on an explicit rollback failure. Lead workflow now marks the connection broken before attempting explicit rollback, prevents a second rollback attempt, and discards failed connections. Awaiting regression CI confirmation.
+
+- Mocked HTTP transaction test now verifies activity INSERT failure prevents COMMIT, triggers ROLLBACK after status UPDATE, and releases a healthy connection for reuse. Real staging PostgreSQL atomicity validation still pending.
