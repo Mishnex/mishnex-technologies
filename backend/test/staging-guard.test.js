@@ -61,3 +61,11 @@ test('rejects lookalike Supabase domains and Auth URL credentials', () => {
     assert.throws(() => assertStagingTarget({ ...valid(), SUPABASE_URL: url }), url);
   }
 });
+
+test('rejects database connection strings that override TLS settings', () => {
+  for (const suffix of ['?sslmode=disable', '?sslmode=no-verify', '?sslrootcert=/tmp/ca.pem', '#fragment']) {
+    assert.throws(() => assertStagingTarget({
+      ...valid(), DATABASE_URL: valid().DATABASE_URL + suffix
+    }), suffix);
+  }
+});
