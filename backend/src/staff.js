@@ -113,7 +113,11 @@ export function staffRoutes({ pool, requireOwner }) {
       const account = staff.rows[0];
       if (!tokenIssuedAfterCutoff(data.access_token, account.sessions_valid_after)) return res.status(401).json({ error:'Session revoked. Sign in again.' });
       if (account.role === 'super_admin' && !account.must_change_password) {
-        const expiresAt = new Date(Date.now() + Math.min(Number(data.expires_in) || 3600, 3600) * 1000);
+        const ttl = Number(data.expires_in);
+        if (!Number.isFinite(ttl) || ttl <= 0 || ttl > 3900) {
+          return res.status(401).json({ error:'Invalid session expiry. Sign in again.' });
+        }
+        const expiresAt = new Date(Date.now() + Math.min(ttl, 3600) * 1000);
         const registered = await pool.query(
           'select public.crm_register_super_admin_session($1,$2,$3) as allowed',
           [account.user_id, fingerprint(data.access_token), expiresAt]
