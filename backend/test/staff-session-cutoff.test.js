@@ -1,11 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// Independent regression model of the staff token cutoff policy.
-// Integration coverage with Supabase and PostgreSQL is still required.
+import { tokenIssuedAfterCutoff } from '../src/staff-session.js';
 function allowed(iat, cutoff) {
-  const cutoffSeconds = new Date(cutoff).getTime() / 1000;
-  return Number.isInteger(iat) && Number.isFinite(cutoffSeconds) && iat > Math.floor(cutoffSeconds);
+  const payload = Buffer.from(JSON.stringify({ iat })).toString('base64url');
+  return tokenIssuedAfterCutoff('header.' + payload + '.signature', cutoff);
 }
 test('rejects tokens issued before a revocation cutoff', () => {
   assert.equal(allowed(100, '1970-01-01T00:01:41.500Z'), false);
