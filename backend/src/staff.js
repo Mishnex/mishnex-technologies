@@ -241,8 +241,11 @@ export function staffRoutes({ pool, requireOwner }) {
       userId = auth.id;
       if (!uuidSchema.safeParse(userId).success) throw new Error('Auth account creation returned an invalid user ID');
       const client = await pool.connect();
+      let transactionOpen = false;
+      let connectionBroken = false;
       try {
         await client.query('BEGIN');
+        transactionOpen = true;
         await client.query(
           'insert into public.crm_staff(user_id,email,full_name,role,created_by) values ($1,$2,$3,$4,$5)',
           [userId,email,fullName,role,req.owner.id]
@@ -253,10 +256,18 @@ export function staffRoutes({ pool, requireOwner }) {
         );
         commitAttempted = true;
         await client.query('COMMIT');
+        transactionOpen = false;
       } catch (error) {
-        await client.query('ROLLBACK').catch(() => {});
+        if (transactionOpen && !commitAttempted) {
+          try { await client.query('ROLLBACK'); transactionOpen = false; }
+          catch (rollbackError) {
+            connectionBroken = true;
+            console.error('Staff provisioning rollback failed:', rollbackError.message);
+          }
+        }
+        if (commitAttempted) connectionBroken = true;
         throw error;
-      } finally { client.release(); }
+      } finally { client.release(connectionBroken || transactionOpen); }
       res.set('Cache-Control','no-store').status(201).json({
         staff: { userId,email,fullName,role,mustChangePassword:true },
         temporaryPassword:password,
