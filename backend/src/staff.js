@@ -46,6 +46,19 @@ export function staffRoutes({ pool, requireOwner }) {
     windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-7',
     legacyHeaders: false, message: { error: 'Too many password changes. Try again later.' }
   });
+  // Central deny-by-default role policy for future CRM endpoints.
+  // Permissions are never inferred from client-supplied role values.
+  const rolePermissions = Object.freeze({
+    super_admin: ['leads:read','leads:manage','quotations:read','quotations:manage','projects:read','projects:manage','payments:read','reports:read'],
+    manager: ['leads:read','leads:manage','quotations:read','quotations:manage','projects:read','projects:manage','reports:read'],
+    sales: ['leads:read','quotations:read'],
+    developer: ['projects:read'],
+    accountant: ['payments:read','reports:read']
+  });
+  function permissionsFor(staff) {
+    if (!staff.is_active || staff.must_change_password) return [];
+    return rolePermissions[staff.role] || [];
+  }
   // Temporary-password login is restricted to password setup; it never grants CRM module access.
   router.post('/login', staffLoginLimiter, async (req, res, next) => {
     if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error:'Staff login is disabled.' });
@@ -90,7 +103,7 @@ export function staffRoutes({ pool, requireOwner }) {
       if (!tokenIssuedAfterCutoff(match[1],staff.sessions_valid_after)) return res.status(401).json({ error:'Session revoked.' });
       res.set('Cache-Control','no-store').json({
         id:staff.user_id,fullName:staff.full_name,role:staff.role,
-        mustChangePassword:staff.must_change_password,crmAccessEnabled:false
+        mustChangePassword:staff.must_change_password,permissions:permissionsFor(staff),crmAccessEnabled:false
       });
     } catch (error) { next(error); }
   });
