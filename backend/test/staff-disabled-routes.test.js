@@ -21,12 +21,14 @@ test('staff CRM and login endpoints stay disabled by default', async () => {
     for (const path of ['/leads', '/permissions/check/leads']) {
       const response = await fetch(base + '/api/admin/staff' + path);
       assert.equal(response.status, 503, path);
+      assert.equal(response.headers.get('cache-control'), 'no-store', path);
     }
     const response = await fetch(base + '/api/admin/staff/login', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: 'test@example.com', password: 'not-a-real-password' })
     });
     assert.equal(response.status, 503);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
   } finally {
     await new Promise((resolve, reject) => server.close(err => err ? reject(err) : resolve()));
     if (previousManagement === undefined) delete process.env.STAFF_MANAGEMENT_ENABLED;
