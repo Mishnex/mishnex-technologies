@@ -18,6 +18,7 @@ function signOut() {
   credentialBox.hidden = true;
   credentialValue.textContent = '';
   staffPanel.hidden = true;
+  leadPanel.hidden = true;
 }
 document.getElementById('signOutButton').addEventListener('click', signOut);
 loginForm.addEventListener('submit', async event => {
@@ -183,3 +184,56 @@ staffForm.addEventListener('submit', async event => {
   } catch (error) { staffStatus.textContent = error.message; }
   finally { submit.disabled = false; }
 });
+
+const leadPanel=document.createElement('section');
+leadPanel.id='ownerLeadManager';
+leadPanel.hidden=true;
+leadPanel.style.marginTop='24px';
+document.getElementById('modulePanel').appendChild(leadPanel);
+const leadTitle=document.createElement('h3');
+leadTitle.textContent='Customer enquiries · Owner only';
+const leadFilter=document.createElement('select');
+leadFilter.setAttribute('aria-label','Filter leads by status');
+for(const value of ['','new','contacted','qualified','proposal','won','lost','closed']){
+  const option=document.createElement('option');
+  option.value=value;
+  option.textContent=value||'All statuses';
+  leadFilter.appendChild(option);
+}
+const leadRefresh=document.createElement('button');
+leadRefresh.type='button';
+leadRefresh.textContent='Refresh leads';
+const leadFeedback=document.createElement('p');
+leadFeedback.setAttribute('role','status');
+const leadResults=document.createElement('div');
+leadPanel.append(leadTitle,leadFilter,document.createTextNode(' '),leadRefresh,leadFeedback,leadResults);
+leadFilter.addEventListener('change',()=>loadLeadPanel());
+leadRefresh.addEventListener('click',()=>loadLeadPanel());
+async function loadLeadPanel(){
+  if(!ownerAccessToken)return;
+  leadPanel.hidden=false;
+  document.querySelector('#modulePanel .module-state').hidden=true;
+  leadResults.replaceChildren();
+  leadFeedback.textContent='Loading enquiries...';
+  try{
+    const query=leadFilter.value?'?status='+encodeURIComponent(leadFilter.value):'';
+    const response=await fetch(apiOrigin+'/api/admin/leads'+query,{
+      headers:{Authorization:'Bearer '+ownerAccessToken}
+    });
+    if(response.status===401||response.status===403){signOut();return;}
+    const data=await response.json();
+    if(!response.ok)throw new Error(data.error||'Unable to load enquiries.');
+    const leads=Array.isArray(data.leads)?data.leads:[];
+    leadFeedback.textContent=leads.length+' enquiries (up to 50 latest).';
+    for(const lead of leads){
+      const item=document.createElement('article');
+      item.className='card';
+      const title=document.createElement('h4');
+      title.textContent=lead.name||'Unnamed enquiry';
+      const details=document.createElement('p');
+      details.textContent=[lead.email,lead.service,lead.status||'Unknown status'].filter(Boolean).join(' · ');
+      item.append(title,details);
+      leadResults.appendChild(item);
+    }
+  }catch(error){leadFeedback.textContent=error.message||'Unable to load enquiries.';}
+}
