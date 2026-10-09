@@ -89,7 +89,7 @@ export function staffRoutes({ pool, requireOwner }) {
   }
   // Read-only permission probe; no CRM business data is exposed here.
   router.get('/permissions/check/leads', (req,res,next) => requireStaffPermission('leads:read',req,res,next), (_req,res) => {
-    res.set('Cache-Control','no-store').json({ allowed:true, permission:'leads:read', crmAccessEnabled:false });
+    res.set('Cache-Control','no-store').json({ allowed:true, permission:'leads:read', crmAccessEnabled:true });
   });
   // A safe, read-only overview for staff with explicit lead read permission.
   // Owner-only lead management endpoints remain unchanged.
