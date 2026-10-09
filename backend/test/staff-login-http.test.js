@@ -1216,3 +1216,58 @@ test('Employee deactivation denies non-Owner requests without opening a transact
     }
   }
 });
+
+test('Owner password reset with provider failure returns recovery error and never reveals temporary password', async () => {
+  const names=['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
+  const saved=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  const originalFetch=globalThis.fetch;
+  let server;
+  const events=[];
+  const staffId='00000000-0000-4000-8000-000000000001';
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key'
+    });
+    globalThis.fetch=async (_url,options)=>{
+      assert.equal(options.method,'PUT');
+      events.push('provider-password-update-failed');
+      return {ok:false,status:503,json:async()=>({message:'simulated provider outage'})};
+    };
+    const pool={query:async sql=>{
+      if(sql.includes('select user_id from public.crm_staff')){
+        events.push('database-active-staff-check');
+        return {rowCount:1,rows:[{user_id:staffId}]};
+      }
+      if(sql.includes('crm_begin_staff_password_change')){
+        events.push('database-session-revoke');
+        return {rowCount:1,rows:[]};
+      }
+      events.push('unexpected-database-query');
+      return {rowCount:1,rows:[]};
+    }};
+    const app=express();
+    app.use('/api/admin/staff',staffRoutes({
+      pool,requireOwner:(req,_res,next)=>{req.owner={id:'00000000-0000-4000-8000-000000000002'};next();}
+    }));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await originalFetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff/'+staffId+'/reset-password',{method:'POST'});
+    assert.equal(response.status,503);
+    assert.equal(response.headers.get('cache-control'),'no-store');
+    const body=await response.json();
+    assert.match(body.error,/Retry the reset or contact support/);
+    assert.equal(body.temporaryPassword,undefined);
+    assert.deepEqual(events,[
+      'database-active-staff-check','database-session-revoke','provider-password-update-failed'
+    ]);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    globalThis.fetch=originalFetch;
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
