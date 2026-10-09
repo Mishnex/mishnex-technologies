@@ -15,6 +15,11 @@ function signOut() {
   loginForm.reset();
   loginMessage.textContent = '';
   document.getElementById('liveLeads')?.remove();
+  document.querySelector('#overview .empty')?.replaceChildren();
+  leadResults.replaceChildren();
+  staffList.replaceChildren();
+  staffStatus.textContent = '';
+  leadFeedback.textContent = '';
   credentialBox.hidden = true;
   credentialValue.textContent = '';
   staffPanel.hidden = true;
@@ -48,12 +53,14 @@ loginForm.addEventListener('submit', async event => {
 });
 async function loadLeads() {
   if (!ownerAccessToken) return;
+  const requestToken = ownerAccessToken;
   const response = await fetch(apiOrigin + '/api/admin/leads', {
     headers: { Authorization: 'Bearer ' + ownerAccessToken }
   });
   if (response.status === 401 || response.status === 403) { signOut(); return; }
   if (!response.ok) return;
   const result = await response.json();
+  if (requestToken !== ownerAccessToken) return;
   const container = document.querySelector('#overview .empty');
   if (!container) return;
   container.replaceChildren();
@@ -211,6 +218,7 @@ leadFilter.addEventListener('change',()=>loadLeadPanel());
 leadRefresh.addEventListener('click',()=>loadLeadPanel());
 async function loadLeadPanel(){
   if(!ownerAccessToken)return;
+  const requestToken=ownerAccessToken;
   leadPanel.hidden=false;
   document.querySelector('#modulePanel .module-state').hidden=true;
   leadResults.replaceChildren();
@@ -222,6 +230,7 @@ async function loadLeadPanel(){
     });
     if(response.status===401||response.status===403){signOut();return;}
     const data=await response.json();
+    if(requestToken!==ownerAccessToken)return;
     if(!response.ok)throw new Error(data.error||'Unable to load enquiries.');
     const leads=Array.isArray(data.leads)?data.leads:[];
     leadFeedback.textContent=leads.length+' enquiries (up to 50 latest).';
@@ -344,5 +353,5 @@ async function loadLeadPanel(){
       item.append(historyButton,history,updateForm);
       leadResults.appendChild(item);
     }
-  }catch(error){leadFeedback.textContent=error.message||'Unable to load enquiries.';}
+  }catch(error){if(requestToken===ownerAccessToken)leadFeedback.textContent=error.message||'Unable to load enquiries.';}
 }
