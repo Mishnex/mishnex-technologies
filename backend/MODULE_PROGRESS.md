@@ -75,3 +75,5 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 - Staff UI ignores delayed credential/list responses when its section is hidden, in addition to sign-out token checks; browser-level regression tests still required.
 
 - Hidden-section guards added for employee deactivation responses and CRM lead list rendering; browser regression tests still pending.
+
+- Lead follow-up history responses now require their card to remain in the visible current lead list; stale history callbacks after refresh/navigation are ignored. Browser regression tests pending.
