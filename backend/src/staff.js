@@ -231,6 +231,7 @@ export function staffRoutes({ pool, requireOwner }) {
     if (!parsed.success) return res.status(400).json({ error: 'Invalid staff details.' });
     const { email, fullName, role } = parsed.data;
     let userId;
+    let commitAttempted = false;
     const password = secret();
     try {
       // Do not send invite or confirmation emails. Credentials shown to Owner exactly once.
@@ -250,9 +251,10 @@ export function staffRoutes({ pool, requireOwner }) {
           "insert into public.crm_staff_audit(actor_id,target_id,action,detail) values ($1,$2,'staff_created',$3)",
           [req.owner.id,userId,JSON.stringify({ role })]
         );
+        commitAttempted = true;
         await client.query('COMMIT');
       } catch (error) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         throw error;
       } finally { client.release(); }
       res.set('Cache-Control','no-store').status(201).json({
@@ -262,6 +264,11 @@ export function staffRoutes({ pool, requireOwner }) {
       });
     } catch (error) {
       let cleanupFailed = false;
+      // A COMMIT error is ambiguous: PostgreSQL may have committed despite a lost response.
+      // Never delete Auth after COMMIT was attempted; require manual reconciliation.
+      if (userId && commitAttempted) return res.status(503).json({
+        error:'Employee creation outcome is uncertain. Do not retry; an authorized operator must reconcile Auth and staff records.'
+      });
       if (userId) {
         try { await adminApi('users/' + encodeURIComponent(userId), 'DELETE'); }
         catch (cleanupError) {
