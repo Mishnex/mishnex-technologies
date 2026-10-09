@@ -12,3 +12,11 @@ Staff provisioning is disabled by default via STAFF_MANAGEMENT_ENABLED.
 Email invitations and paid SMTP are not required for manual staff provisioning. Temporary credentials must be shared through a secure channel. Do not store or log plaintext passwords.
 
 Status: not ready for staff production use. No changes to the public website's main branch.
+## Development status (2026-10-09)
+
+- Added staff logout request to Supabase Auth and local Super Admin token-fingerprint revocation; integration tests still pending.
+- Added role-gated staff Leads read endpoint and session-cap database function; not yet approved for production use.
+- Confirm the Supabase logout scope and refresh-token behavior with real test accounts before enabling staff access.
+- Verify database TLS, Owner authentication, staff account creation, password reset, logout, and role permissions end-to-end.
+- Confirm the five-session cap under concurrent login attempts, logout, expiry, and account deactivation.
+- Keep STAFF_MANAGEMENT_ENABLED=false until all checks pass; do not merge development into main.
