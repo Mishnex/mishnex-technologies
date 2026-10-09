@@ -19,3 +19,17 @@ test('fails closed on invalid timestamps and missing iat', () => {
   assert.equal(allowed(102, 'invalid'), false);
   assert.equal(allowed(undefined, '1970-01-01T00:01:41.500Z'), false);
 });
+
+test('rejects malformed JWT structures', () => {
+  assert.equal(tokenIssuedAfterCutoff('', '1970-01-01T00:00:00Z'), false);
+  assert.equal(tokenIssuedAfterCutoff('bad.token', '1970-01-01T00:00:00Z'), false);
+  assert.equal(tokenIssuedAfterCutoff('header.!!.signature', '1970-01-01T00:00:00Z'), false);
+});
+test('rejects non-integer issued-at timestamps', () => {
+  assert.equal(allowed('102', '1970-01-01T00:01:41.500Z'), false);
+  assert.equal(allowed(102.5, '1970-01-01T00:01:41.500Z'), false);
+});
+test('rejects a token issued exactly at logout cutoff', () => {
+  assert.equal(allowed(200, '1970-01-01T00:03:20.000Z'), false);
+  assert.equal(allowed(201, '1970-01-01T00:03:20.000Z'), true);
+});
