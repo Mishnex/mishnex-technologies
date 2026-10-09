@@ -30,3 +30,21 @@ test('unknown roles and missing staff fail closed', () => {
   assert.deepEqual(permissionsFor(active('unknown')), []);
   assert.deepEqual(permissionsFor(null), []);
 });
+
+test('accountant can read payments but cannot manage projects', () => {
+  assert.equal(permissionsFor(active('accountant')).includes('payments:read'), true);
+  assert.equal(permissionsFor(active('accountant')).includes('projects:manage'), false);
+});
+test('developer can read projects but cannot manage payments', () => {
+  assert.equal(permissionsFor(active('developer')).includes('projects:read'), true);
+  assert.equal(permissionsFor(active('developer')).includes('payments:read'), false);
+});
+test('sales cannot manage quotations', () => {
+  assert.equal(permissionsFor(active('sales')).includes('quotations:read'), true);
+  assert.equal(permissionsFor(active('sales')).includes('quotations:manage'), false);
+});
+test('role permissions cannot be modified at runtime', async () => {
+  const { rolePermissions } = await import('../src/staff-permissions.js');
+  assert.equal(Object.isFrozen(rolePermissions), true);
+  for (const grants of Object.values(rolePermissions)) assert.equal(Object.isFrozen(grants), true);
+});
