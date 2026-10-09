@@ -9,6 +9,11 @@ import { z } from 'zod';
 // Supabase service-role credentials MUST only exist in Render server environment.
 export function staffRoutes({ pool, requireOwner }) {
   const router = Router();
+  // Staff auth responses and one-time credentials must never be cached.
+  router.use((_req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    next();
+  });
   const staffSchema = z.object({
     email: z.string().email().max(254).transform(v => v.trim().toLowerCase()),
     fullName: z.string().trim().min(2).max(120),
