@@ -170,7 +170,7 @@ app.get('/api/admin/me', requireOwner, (req, res) => {
 app.get('/api/admin/leads', requireOwner, async (_req, res, next) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, email, phone, service, budget, preferred_call_time, requirement, created_at FROM public.crm_leads ORDER BY created_at DESC LIMIT 50'
+      'SELECT id, name, email, phone, service, budget, preferred_call_time, requirement, status, created_at FROM public.crm_leads ORDER BY created_at DESC LIMIT 50'
     );
     res.set('Cache-Control', 'no-store');
     res.json({ leads: result.rows });
