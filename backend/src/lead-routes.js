@@ -34,19 +34,25 @@ export function leadWorkflowRoutes({ pool, requireOwner }) {
         [leadId.data]
       );
       if (!current.rowCount) {
-        await client.query('ROLLBACK');
         transactionOpen = false;
+        connectionBroken = true;
+        await client.query('ROLLBACK');
+        connectionBroken = false;
         return res.status(404).json({ error: 'Lead not found.' });
       }
       const from = current.rows[0].status;
       if (from === parsed.data.status && !parsed.data.note) {
-        await client.query('ROLLBACK');
         transactionOpen = false;
+        connectionBroken = true;
+        await client.query('ROLLBACK');
+        connectionBroken = false;
         return res.status(400).json({ error: 'A follow-up note is required when the status is unchanged.' });
       }
       if (!canTransitionLead(from, parsed.data.status)) {
-        await client.query('ROLLBACK');
         transactionOpen = false;
+        connectionBroken = true;
+        await client.query('ROLLBACK');
+        connectionBroken = false;
         return res.status(409).json({ error: 'Lead status transition is not allowed.' });
       }
       if (from !== parsed.data.status) {
