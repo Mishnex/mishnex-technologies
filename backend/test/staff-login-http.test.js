@@ -1147,3 +1147,42 @@ test('Owner employee creation rejects invalid inputs before Auth or database acc
     }
   }
 });
+
+test('Employee creation is denied to unauthenticated users before any side effects', async () => {
+  const names=['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
+  const saved=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  const originalFetch=globalThis.fetch;
+  let server;
+  let providerCalls=0;
+  let databaseCalls=0;
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key'
+    });
+    globalThis.fetch=async()=>{providerCalls++;throw new Error('Unexpected provider call');};
+    const app=express();
+    app.use(express.json());
+    app.use('/api/admin/staff',staffRoutes({
+      pool:{connect:async()=>{databaseCalls++;throw new Error('Unexpected database call');}},
+      requireOwner:(_req,res)=>res.status(401).json({error:'Owner authentication required.'})
+    }));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await originalFetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({email:'staff@example.com',fullName:'Test Employee',role:'sales'})
+    });
+    assert.equal(response.status,401);
+    assert.equal(providerCalls,0);
+    assert.equal(databaseCalls,0);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    globalThis.fetch=originalFetch;
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
