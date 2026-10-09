@@ -80,3 +80,31 @@ test('lead activity history rejects requests when feature disabled',async()=>{
     else process.env.LEAD_WORKFLOW_ENABLED=previous;
   }
 });
+
+test('lead activity history returns 404 for unknown lead without reading activity',async()=>{
+  const previous=process.env.LEAD_WORKFLOW_ENABLED;
+  process.env.LEAD_WORKFLOW_ENABLED='true';
+  const queries=[];
+  const app=express();
+  app.use('/api/admin/lead-workflow',leadWorkflowRoutes({
+    pool:{query:async(sql,params)=>{
+      queries.push(sql);
+      assert.deepEqual(params,[leadId]);
+      return {rowCount:0,rows:[]};
+    }},
+    requireOwner:(req,_res,next)=>{req.owner={id:ownerId};next();}
+  }));
+  const server=app.listen(0,'127.0.0.1');
+  try {
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/lead-workflow/'+leadId+'/activity');
+    assert.equal(response.status,404);
+    assert.equal((await response.json()).error,'Lead not found.');
+    assert.equal(queries.length,1);
+    assert.match(queries[0],/SELECT 1 FROM public.crm_leads/);
+  } finally {
+    await new Promise(resolve=>server.close(resolve));
+    if(previous===undefined) delete process.env.LEAD_WORKFLOW_ENABLED;
+    else process.env.LEAD_WORKFLOW_ENABLED=previous;
+  }
+});
