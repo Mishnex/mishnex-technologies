@@ -272,13 +272,34 @@ async function loadLeadPanel(){
       updateForm.style.marginTop='12px';
       const statusSelect=document.createElement('select');
       statusSelect.setAttribute('aria-label','New lead status');
-      for(const status of ['new','contacted','qualified','proposal','won','lost','closed']){
-        const option=document.createElement('option');
-        option.value=status;
-        option.textContent=status;
-        statusSelect.appendChild(option);
+      const allowedLeadTransitions={
+        new:['contacted','qualified','lost'],
+        contacted:['qualified','lost'],
+        qualified:['proposal','lost'],
+        proposal:['won','lost'],
+        won:[],lost:[],closed:[]
+      };
+      function refreshLeadStatusOptions(){
+        const current=lead.status;
+        statusSelect.replaceChildren();
+        if(!Object.hasOwn(allowedLeadTransitions,current)){
+          const option=document.createElement('option');
+          option.textContent='Unknown status — refresh required';
+          option.value='';
+          statusSelect.appendChild(option);
+          statusSelect.disabled=true;
+          return;
+        }
+        statusSelect.disabled=false;
+        for(const status of [current,...allowedLeadTransitions[current]]){
+          const option=document.createElement('option');
+          option.value=status;
+          option.textContent=status;
+          statusSelect.appendChild(option);
+        }
+        statusSelect.value=current;
       }
-      statusSelect.value=lead.status||'new';
+      refreshLeadStatusOptions();
       const noteInput=document.createElement('textarea');
       noteInput.placeholder='Follow-up note (required if status stays the same)';
       noteInput.maxLength=2000;
@@ -292,6 +313,7 @@ async function loadLeadPanel(){
       updateForm.append(statusSelect,noteInput,saveButton,updateFeedback);
       updateForm.addEventListener('submit',async(event)=>{
         event.preventDefault();
+        if(statusSelect.disabled)return;
         saveButton.disabled=true;
         updateFeedback.textContent='Saving...';
         try{
@@ -311,6 +333,7 @@ async function loadLeadPanel(){
           }else{
             updateFeedback.textContent='Follow-up saved.';
             lead.status=data.status;
+            refreshLeadStatusOptions();
             details.textContent=[lead.email,lead.service,lead.status].filter(Boolean).join(' · ');
             noteInput.value='';
             history.hidden=true;
