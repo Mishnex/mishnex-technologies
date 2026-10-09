@@ -7,7 +7,7 @@ export function tokenIssuedAfterCutoff(accessToken, cutoff) {
     if (!/^[A-Za-z0-9_-]+$/.test(parts[1])) return false;
     const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
     const cutoffSeconds = new Date(cutoff).getTime() / 1000;
-    return Number.isInteger(payload.iat) && Number.isFinite(cutoffSeconds) && payload.iat > Math.floor(cutoffSeconds);
+    return Number.isSafeInteger(payload.iat) && payload.iat >= 0 && Number.isFinite(cutoffSeconds) && payload.iat > Math.floor(cutoffSeconds);
   } catch {
     return false;
   }
