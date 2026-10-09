@@ -200,3 +200,54 @@ test('Super Admin HTTP login succeeds only after session registration and reject
     }
   }
 });
+
+test('staff identity HTTP endpoint denies disabled and revoked sessions', async () => {
+  const names = ['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SUPABASE_ANON_KEY'];
+  const saved = Object.fromEntries(names.map(name => [name, process.env[name]]));
+  const originalFetch = globalThis.fetch;
+  let server;
+  let active = true;
+  const issued = Math.floor(Date.now() / 1000) - 5;
+  const token = jwt(issued);
+  let cutoff = new Date((issued - 5) * 1000).toISOString();
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key',
+      SUPABASE_ANON_KEY:'fake-test-only-anon-key'
+    });
+    globalThis.fetch = async () => ({
+      ok:true, json:async () => ({id:'00000000-0000-4000-8000-000000000001'})
+    });
+    const pool = {query:async () => ({
+      rowCount:1,rows:[{
+        user_id:'00000000-0000-4000-8000-000000000001',
+        full_name:'Test Employee',role:'sales',is_active:active,
+        must_change_password:false,sessions_valid_after:cutoff
+      }]
+    })};
+    const app = express();
+    app.use('/api/admin/staff',staffRoutes({pool,requireOwner:(_req,res)=>res.sendStatus(403)}));
+    server = app.listen(0,'127.0.0.1');
+    await new Promise(resolve => server.once('listening',resolve));
+    const url = 'http://127.0.0.1:' + server.address().port + '/api/admin/staff/me';
+    const check = () => originalFetch(url,{headers:{authorization:'Bearer ' + token}});
+    const valid = await check();
+    assert.equal(valid.status,200);
+    assert.equal(valid.headers.get('cache-control'),'no-store');
+    assert.equal((await valid.json()).role,'sales');
+    active = false;
+    assert.equal((await check()).status,403);
+    active = true;
+    cutoff = new Date((issued + 2) * 1000).toISOString();
+    assert.equal((await check()).status,401);
+  } finally {
+    if (server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    globalThis.fetch = originalFetch;
+    for (const name of names) {
+      if (saved[name] === undefined) delete process.env[name];
+      else process.env[name] = saved[name];
+    }
+  }
+});
