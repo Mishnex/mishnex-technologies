@@ -3,7 +3,7 @@
 This procedure is for authorized operators only. Do not enable staff feature flags to investigate provisioning failures.
 
 ## When to use
-Employee creation returns a server error after Supabase Auth user creation. The database insert or audit write may have failed; the compensating Auth deletion may also have failed. An Auth-only (orphan) account can remain.
+Employee creation returns a server error after Supabase Auth user creation. The database insert or audit write may have failed; the compensating Auth deletion may also have failed. A network failure during COMMIT can also mean that PostgreSQL committed successfully but the API did not receive confirmation. The application now deliberately skips Auth deletion after a COMMIT attempt; it returns an uncertain-outcome response requiring reconciliation. An Auth-only (orphan) account can remain.
 
 ## Immediate precautions
 1. Keep `STAFF_MANAGEMENT_ENABLED` and `STAFF_CRM_ENABLED` disabled until the incident is resolved and activation is explicitly approved.
@@ -33,7 +33,7 @@ limit 25;
 
 4. Interpret carefully:
    - Auth user exists, no CRM row: likely orphan Auth account.
-   - Both exist: do **not** delete automatically; inspect whether the transaction committed and whether an audit record exists.
+   - Both exist: treat the database transaction as potentially committed. **Never delete the Auth account**; confirm the employee and audit records before any follow-up action.
    - Neither exists: provisioning likely rolled back and Auth cleanup succeeded.
    - Database unavailable: postpone conclusions until read-only reconciliation is possible.
 
