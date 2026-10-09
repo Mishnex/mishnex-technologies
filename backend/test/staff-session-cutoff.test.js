@@ -42,3 +42,10 @@ test('rejects JWTs without all three nonempty segments', () => {
   assert.equal(tokenIssuedAfterCutoff('.' + payload + '.signature', cutoff), false);
   assert.equal(tokenIssuedAfterCutoff(null, cutoff), false);
 });
+
+test('rejects JWT payload segments with non-base64url characters', () => {
+  const cutoff = '1970-01-01T00:01:41.500Z';
+  assert.equal(tokenIssuedAfterCutoff('header.ab+c.signature', cutoff), false);
+  assert.equal(tokenIssuedAfterCutoff('header.ab=c.signature', cutoff), false);
+  assert.equal(tokenIssuedAfterCutoff('header.ab/c.signature', cutoff), false);
+});
