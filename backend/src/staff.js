@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Router } from 'express';
+import { tokenIssuedAfterCutoff } from './staff-session.js';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 
@@ -31,15 +32,6 @@ export function staffRoutes({ pool, requireOwner }) {
       throw error;
     }
     return data;
-  }
-  function tokenIssuedAfterCutoff(accessToken, cutoff) {
-    try {
-      const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64url').toString('utf8'));
-      const cutoffSeconds = new Date(cutoff).getTime() / 1000;
-      // JWT iat is second-resolution. Fail closed for tokens issued in the cutoff second.
-      // A fresh login may need to wait until the next second after a password reset.
-      return Number.isInteger(payload.iat) && Number.isFinite(cutoffSeconds) && payload.iat > Math.floor(cutoffSeconds);
-    } catch { return false; }
   }
   const staffLoginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-7',
