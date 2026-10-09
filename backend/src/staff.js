@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Router } from 'express';
 import { tokenIssuedAfterCutoff } from './staff-session.js';
+import { permissionsFor as sharedPermissionsFor } from './staff-permissions.js';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 
@@ -81,7 +82,7 @@ export function staffRoutes({ pool, requireOwner }) {
         );
         if (!active.rowCount) return res.status(401).json({ error:'Super Admin session revoked.' });
       }
-      if (!permissionsFor(staff).includes(permission)) return res.status(403).json({ error:'Insufficient permissions.' });
+      if (!sharedPermissionsFor(staff).includes(permission)) return res.status(403).json({ error:'Insufficient permissions.' });
       req.staff = { id:user.id, role:staff.role };
       next();
     } catch(error) { next(error); }
@@ -159,7 +160,7 @@ export function staffRoutes({ pool, requireOwner }) {
       }
       res.set('Cache-Control','no-store').json({
         id:staff.user_id,fullName:staff.full_name,role:staff.role,
-        mustChangePassword:staff.must_change_password,permissions:permissionsFor(staff),crmAccessEnabled:false
+        mustChangePassword:staff.must_change_password,permissions:sharedPermissionsFor(staff),crmAccessEnabled:false
       });
     } catch (error) { next(error); }
   });
