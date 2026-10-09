@@ -865,3 +865,66 @@ test('Owner creates employee only after Auth, staff row and audit transaction su
     }
   }
 });
+
+test('Owner employee creation cleans up Auth account if database audit fails', async () => {
+  const names=['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
+  const saved=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  const originalFetch=globalThis.fetch;
+  let server;
+  const events=[];
+  const staffId='00000000-0000-4000-8000-000000000001';
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key'
+    });
+    globalThis.fetch=async (url,options)=>{
+      if(options.method==='DELETE'){
+        assert.ok(String(url).endsWith('/auth/v1/admin/users/'+staffId));
+        events.push('provider-cleanup');
+        return {ok:true,json:async()=>({})};
+      }
+      events.push('provider-create');
+      return {ok:true,json:async()=>({id:staffId})};
+    };
+    const client={
+      query:async sql=>{
+        if(sql==='BEGIN') events.push('database-begin');
+        else if(sql.includes('insert into public.crm_staff(')) events.push('database-staff-insert');
+        else if(sql.includes('staff_created')){
+          events.push('database-audit-failed');
+          throw new Error('simulated audit insert failure');
+        } else if(sql==='ROLLBACK') events.push('database-rollback');
+        else if(sql==='COMMIT') events.push('unexpected-commit');
+        return {rowCount:1,rows:[]};
+      },
+      release:()=>{}
+    };
+    const app=express();
+    app.use(express.json());
+    app.use('/api/admin/staff',staffRoutes({
+      pool:{connect:async()=>client},
+      requireOwner:(req,_res,next)=>{req.owner={id:'00000000-0000-4000-8000-000000000002'};next();}
+    }));
+    app.use((_err,_req,res,_next)=>res.status(503).json({error:'Service temporarily unavailable.'}));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await originalFetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({email:'staff@example.com',fullName:'Test Employee',role:'sales'})
+    });
+    assert.equal(response.status,503);
+    assert.deepEqual(events,[
+      'provider-create','database-begin','database-staff-insert',
+      'database-audit-failed','database-rollback','provider-cleanup'
+    ]);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    globalThis.fetch=originalFetch;
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
