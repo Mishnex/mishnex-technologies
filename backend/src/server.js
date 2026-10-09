@@ -7,6 +7,7 @@ import pg from 'pg';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { leadSchema } from './validation.js';
+import { staffRoutes } from './staff.js';
 
 const { Pool } = pg;
 const app = express();
@@ -152,6 +153,7 @@ async function requireOwner(req, res, next) {
     next();
   } catch (error) { next(error); }
 }
+app.use('/api/admin/staff', staffRoutes({ pool, requireOwner }));
 app.get('/api/admin/me', requireOwner, (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({ id: req.owner.id, email: req.owner.email, role: 'owner' });
