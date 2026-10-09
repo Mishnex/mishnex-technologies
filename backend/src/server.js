@@ -4,6 +4,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import pg from 'pg';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { leadSchema } from './validation.js';
 
 const { Pool } = pg;
@@ -49,6 +51,44 @@ app.post('/api/public/leads', leadLimiter, async (req, res, next) => {
     );
     return res.status(201).json({ received: true, leadId: result.rows[0].id });
   } catch (error) { return next(error); }
+});
+
+
+// Password recovery is hosted on the API domain so it works before the public site deploy.
+app.get('/reset-password', async (_req, res, next) => {
+  try {
+    const page = await readFile(fileURLToPath(new URL('../public/reset-password.html', import.meta.url)), 'utf8');
+    res.set('Cache-Control', 'no-store');
+    res.type('html').send(page);
+  } catch (error) { next(error); }
+});
+app.get('/api/public/auth-config', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ url: process.env.SUPABASE_URL || null, key: process.env.SUPABASE_ANON_KEY || null });
+});
+const recoveryLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, limit: 3, standardHeaders: 'draft-7',
+  legacyHeaders: false, message: { error: 'Too many requests. Please try later.' }
+});
+app.post('/api/admin/password-recovery', recoveryLimiter, async (req, res, next) => {
+  if (!authConfigured()) return res.status(503).json({ error: 'Recovery is not configured.' });
+  const email = req.body?.email;
+  if (typeof email !== 'string' || email.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return res.status(400).json({ error: 'Enter a valid email address.' });
+  }
+  // Prevent recovery-email abuse: only the configured Owner email may receive mail.
+  try {
+    if (!process.env.OWNER_EMAIL || process.env.OWNER_EMAIL.toLowerCase() !== email.toLowerCase()) {
+      return res.json({ message: 'If this is the Owner account, a recovery email will be sent.' });
+    }
+    const redirectTo = 'https://mishnex-crm-api.onrender.com/reset-password';
+    const response = await fetch(new URL('/auth/v1/recover?redirect_to=' + encodeURIComponent(redirectTo), process.env.SUPABASE_URL), {
+      method: 'POST', headers: { apikey: process.env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }), signal: AbortSignal.timeout(8000)
+    });
+    if (!response.ok) console.error('Supabase recovery request failed:', response.status);
+    res.json({ message: 'If this is the Owner account, a recovery email will be sent.' });
+  } catch (error) { next(error); }
 });
 
 const adminLoginLimiter = rateLimit({
