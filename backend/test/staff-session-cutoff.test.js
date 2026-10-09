@@ -49,3 +49,8 @@ test('rejects JWT payload segments with non-base64url characters', () => {
   assert.equal(tokenIssuedAfterCutoff('header.ab=c.signature', cutoff), false);
   assert.equal(tokenIssuedAfterCutoff('header.ab/c.signature', cutoff), false);
 });
+
+test('JWT issued-at rejects boolean and negative values', () => {
+  assert.equal(allowed(true, '1970-01-01T00:00:00Z'), false);
+  assert.equal(allowed(-1, '1970-01-01T00:00:00Z'), false);
+});
