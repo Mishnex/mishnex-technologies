@@ -626,3 +626,46 @@ test('Owner staff password reset revokes sessions before updating provider crede
     }
   }
 });
+
+test('Owner staff reset does not update Auth credentials when DB revocation fails', async () => {
+  const names=['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
+  const saved=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  const originalFetch=globalThis.fetch;
+  let server;
+  let providerCalls=0;
+  const staffId='00000000-0000-4000-8000-000000000001';
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key'
+    });
+    globalThis.fetch=async()=>{
+      providerCalls++;
+      throw new Error('Provider should not be called');
+    };
+    const pool={query:async sql=>{
+      if(sql.includes('crm_begin_staff_password_change')) throw new Error('simulated database outage');
+      return {rowCount:1,rows:[{user_id:staffId}]};
+    }};
+    const app=express();
+    app.use(express.json());
+    app.use('/api/admin/staff',staffRoutes({
+      pool,requireOwner:(req,_res,next)=>{req.owner={id:'00000000-0000-4000-8000-000000000002'};next();}
+    }));
+    app.use((_err,_req,res,_next)=>res.status(503).json({error:'Service temporarily unavailable.'}));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await originalFetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff/'+staffId+'/reset-password',{method:'POST'});
+    assert.equal(response.status,503);
+    assert.equal(response.headers.get('cache-control'),'no-store');
+    assert.equal(providerCalls,0);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    globalThis.fetch=originalFetch;
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
