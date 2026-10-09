@@ -263,3 +263,40 @@ test('lead transaction rollback failure discards broken PostgreSQL connection',a
     else process.env.LEAD_WORKFLOW_ENABLED=previous;
   }
 });
+
+test('lead activity insert failure rolls back the status update and reuses healthy connection',async()=>{
+  const previous=process.env.LEAD_WORKFLOW_ENABLED;
+  process.env.LEAD_WORKFLOW_ENABLED='true';
+  const calls=[],releases=[];
+  const client={
+    query:async(sql,params)=>{
+      calls.push({sql,params});
+      if(sql.startsWith('SELECT status'))return {rowCount:1,rows:[{status:'new'}]};
+      if(sql.startsWith('INSERT INTO public.crm_lead_activity'))throw new Error('activity insert rejected');
+      return {rowCount:1,rows:[]};
+    },
+    release:broken=>releases.push(broken)
+  };
+  const app=express();
+  app.use(express.json());
+  app.use('/api/admin/lead-workflow',leadWorkflowRoutes({
+    pool:{connect:async()=>client},
+    requireOwner:(req,_res,next)=>{req.owner={id:ownerId};next();}
+  }));
+  app.use((_error,_req,res,_next)=>res.status(500).json({error:'Internal server error'}));
+  const server=app.listen(0,'127.0.0.1');
+  try{
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/lead-workflow/'+leadId+'/status',{
+      method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({status:'contacted',note:'Called'})
+    });
+    assert.equal(response.status,500);
+    assert.deepEqual(calls.map(call=>call.sql.split(' ')[0]),['BEGIN','SELECT','UPDATE','INSERT','ROLLBACK']);
+    assert.deepEqual(releases,[false],'successful rollback may reuse the connection');
+    assert.equal(calls.some(call=>call.sql==='COMMIT'),false,'failed activity insert must not commit the lead status');
+  }finally{
+    await new Promise(resolve=>server.close(resolve));
+    if(previous===undefined)delete process.env.LEAD_WORKFLOW_ENABLED;
+    else process.env.LEAD_WORKFLOW_ENABLED=previous;
+  }
+});
