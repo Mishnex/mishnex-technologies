@@ -1,0 +1,15 @@
+-- Read-only CRM security verification. Safe to run on staging or production.
+-- Expected: rls_tables=3, readable_tables=0, exposed_functions=0,
+-- active_super_admin_sessions <= 5.
+select
+ (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+  where n.nspname='public' and c.relname in ('crm_staff','crm_staff_audit','crm_super_admin_sessions')
+    and c.relrowsecurity) as rls_tables,
+ (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+  where n.nspname='public' and c.relname in ('crm_staff','crm_staff_audit','crm_super_admin_sessions')
+    and (has_table_privilege('anon',c.oid,'SELECT') or has_table_privilege('authenticated',c.oid,'SELECT'))) as readable_tables,
+ (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+  where n.nspname='public' and p.proname in
+    ('crm_register_super_admin_session','crm_complete_staff_password_change','crm_revoke_staff_sessions_on_logout')
+    and (has_function_privilege('anon',p.oid,'EXECUTE') or has_function_privilege('authenticated',p.oid,'EXECUTE'))) as exposed_functions,
+ (select count(*) from public.crm_super_admin_sessions where revoked_at is null and expires_at>now()) as active_super_admin_sessions;
