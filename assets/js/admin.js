@@ -16,6 +16,7 @@ function signOut() {
   loginMessage.textContent = '';
   document.getElementById('liveLeads')?.remove();
   document.querySelector('#overview .empty')?.replaceChildren();
+  leadListRequestId++;
   leadResults.replaceChildren();
   staffList.replaceChildren();
   staffStatus.textContent = '';
@@ -216,12 +217,14 @@ leadRefresh.textContent='Refresh leads';
 const leadFeedback=document.createElement('p');
 leadFeedback.setAttribute('role','status');
 const leadResults=document.createElement('div');
+let leadListRequestId=0;
 leadPanel.append(leadTitle,leadFilter,document.createTextNode(' '),leadRefresh,leadFeedback,leadResults);
 leadFilter.addEventListener('change',()=>loadLeadPanel());
 leadRefresh.addEventListener('click',()=>loadLeadPanel());
 async function loadLeadPanel(){
   if(!ownerAccessToken)return;
   const requestToken=ownerAccessToken;
+  const requestId=++leadListRequestId;
   leadPanel.hidden=false;
   document.querySelector('#modulePanel .module-state').hidden=true;
   leadResults.replaceChildren();
@@ -231,10 +234,10 @@ async function loadLeadPanel(){
     const response=await fetch(apiOrigin+'/api/admin/leads'+query,{
       headers:{Authorization:'Bearer '+ownerAccessToken}
     });
-    if(requestToken!==ownerAccessToken)return;
+    if(requestToken!==ownerAccessToken||requestId!==leadListRequestId)return;
     if(response.status===401||response.status===403){signOut();return;}
     const data=await response.json();
-    if(requestToken!==ownerAccessToken)return;
+    if(requestToken!==ownerAccessToken||requestId!==leadListRequestId)return;
     if(!response.ok)throw new Error(data.error||'Unable to load enquiries.');
     const leads=Array.isArray(data.leads)?data.leads:[];
     leadFeedback.textContent=leads.length+' enquiries (up to 50 latest).';
@@ -263,7 +266,6 @@ async function loadLeadPanel(){
           const response=await fetch(apiOrigin+'/api/admin/lead-workflow/'+encodeURIComponent(lead.id)+'/activity',{
             headers:{Authorization:'Bearer '+ownerAccessToken}
           });
-          if(requestToken!==ownerAccessToken)return;
           if(requestToken!==ownerAccessToken)return;
           if(response.status===401||response.status===403){signOut();return;}
           const data=await response.json().catch(()=>({}));
@@ -365,5 +367,5 @@ async function loadLeadPanel(){
       item.append(historyButton,history,updateForm);
       leadResults.appendChild(item);
     }
-  }catch(error){if(requestToken===ownerAccessToken)leadFeedback.textContent=error.message||'Unable to load enquiries.';}
+  }catch(error){if(requestToken===ownerAccessToken&&requestId===leadListRequestId)leadFeedback.textContent=error.message||'Unable to load enquiries.';}
 }
