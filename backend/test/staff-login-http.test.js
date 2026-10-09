@@ -1493,3 +1493,56 @@ test('Owner employee creation cleans Auth account when database connection fails
     }
   }
 });
+
+test('Owner employee creation trims and lowercases email before Auth provisioning', async () => {
+  const names=['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
+  const saved=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  const originalFetch=globalThis.fetch;
+  let server;
+  const staffId='00000000-0000-4000-8000-000000000001';
+  const events=[];
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key'
+    });
+    globalThis.fetch=async (_url,options)=>{
+      events.push('auth');
+      assert.equal(JSON.parse(options.body).email,'staff@example.com');
+      return {ok:true,json:async()=>({id:staffId})};
+    };
+    const client={
+      query:async (sql,params)=>{
+        if(sql.includes('insert into public.crm_staff(')){
+          events.push('staff-insert');
+          assert.equal(params[1],'staff@example.com');
+        }
+        return {rowCount:1,rows:[]};
+      },
+      release:()=>{}
+    };
+    const app=express();
+    app.use(express.json());
+    app.use('/api/admin/staff',staffRoutes({
+      pool:{connect:async()=>client},
+      requireOwner:(req,_res,next)=>{req.owner={id:'00000000-0000-4000-8000-000000000002'};next();}
+    }));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await originalFetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({email:'  STAFF@Example.COM  ',fullName:'Test Employee',role:'sales'})
+    });
+    assert.equal(response.status,201);
+    assert.equal((await response.json()).staff.email,'staff@example.com');
+    assert.deepEqual(events,['auth','staff-insert']);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    globalThis.fetch=originalFetch;
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
