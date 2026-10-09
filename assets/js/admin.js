@@ -268,7 +268,57 @@ async function loadLeadPanel(){
         }catch(error){history.textContent='Unable to load follow-up history.';}
         finally{historyButton.disabled=false;}
       });
-      item.append(historyButton,history);
+      const updateForm=document.createElement('form');
+      updateForm.style.marginTop='12px';
+      const statusSelect=document.createElement('select');
+      statusSelect.setAttribute('aria-label','New lead status');
+      for(const status of ['new','contacted','qualified','proposal','won','lost','closed']){
+        const option=document.createElement('option');
+        option.value=status;
+        option.textContent=status;
+        statusSelect.appendChild(option);
+      }
+      statusSelect.value=lead.status||'new';
+      const noteInput=document.createElement('textarea');
+      noteInput.placeholder='Follow-up note (required if status stays the same)';
+      noteInput.maxLength=2000;
+      noteInput.rows=2;
+      noteInput.setAttribute('aria-label','Follow-up note');
+      const saveButton=document.createElement('button');
+      saveButton.type='submit';
+      saveButton.textContent='Save follow-up';
+      const updateFeedback=document.createElement('p');
+      updateFeedback.setAttribute('role','status');
+      updateForm.append(statusSelect,noteInput,saveButton,updateFeedback);
+      updateForm.addEventListener('submit',async(event)=>{
+        event.preventDefault();
+        saveButton.disabled=true;
+        updateFeedback.textContent='Saving...';
+        try{
+          const payload={status:statusSelect.value};
+          if(noteInput.value.trim())payload.note=noteInput.value.trim();
+          const response=await fetch(apiOrigin+'/api/admin/lead-workflow/'+encodeURIComponent(lead.id)+'/status',{
+            method:'PATCH',
+            headers:{Authorization:'Bearer '+ownerAccessToken,'Content-Type':'application/json'},
+            body:JSON.stringify(payload)
+          });
+          if(response.status===401||response.status===403){signOut();return;}
+          const data=await response.json().catch(()=>({}));
+          if(response.status===503){
+            updateFeedback.textContent='Lead updates are not enabled yet. No changes saved.';
+          }else if(!response.ok){
+            updateFeedback.textContent=data.error||'Unable to save follow-up.';
+          }else{
+            updateFeedback.textContent='Follow-up saved.';
+            lead.status=data.status;
+            details.textContent=[lead.email,lead.service,lead.status].filter(Boolean).join(' · ');
+            noteInput.value='';
+            history.hidden=true;
+          }
+        }catch(error){updateFeedback.textContent='Unable to save follow-up.';}
+        finally{saveButton.disabled=false;}
+      });
+      item.append(historyButton,history,updateForm);
       leadResults.appendChild(item);
     }
   }catch(error){leadFeedback.textContent=error.message||'Unable to load enquiries.';}
