@@ -135,7 +135,7 @@ async function loadStaffPanel() {
   staffStatus.textContent = 'Loading staff...';
   try {
     const result = await staffRequest('/');
-    if(requestToken!==ownerAccessToken)return;
+    if(requestToken!==ownerAccessToken||staffPanel.hidden)return;
     staffStatus.textContent = '';
     if (!result.staff.length) { staffList.textContent = 'No employees added yet.'; return; }
     result.staff.forEach(member => {
@@ -155,11 +155,11 @@ async function loadStaffPanel() {
           credentialBox.hidden = true;
           try {
             const result = await staffRequest('/' + encodeURIComponent(member.user_id) + '/reset-password', { method:'POST' });
-            if (requestToken !== ownerAccessToken) return;
+            if (requestToken !== ownerAccessToken || staffPanel.hidden) return;
             credentialValue.textContent = result.temporaryPassword;
             credentialBox.hidden = false;
             staffStatus.textContent = result.warning;
-          } catch (error) { if (requestToken === ownerAccessToken) staffStatus.textContent = error.message; }
+          } catch (error) { if (requestToken === ownerAccessToken && !staffPanel.hidden) staffStatus.textContent = error.message; }
           finally { reset.disabled = false; }
         });
         row.appendChild(reset);
@@ -187,7 +187,7 @@ async function loadStaffPanel() {
       }
       staffList.appendChild(row);
     });
-  } catch (error) { if(requestToken===ownerAccessToken)staffStatus.textContent = error.message; }
+  } catch (error) { if(requestToken===ownerAccessToken&&!staffPanel.hidden)staffStatus.textContent = error.message; }
 }
 staffForm.addEventListener('submit', async event => {
   event.preventDefault();
@@ -200,10 +200,10 @@ staffForm.addEventListener('submit', async event => {
   try {
     const fields = new FormData(staffForm);
     const result = await staffRequest('/', { method:'POST', body:JSON.stringify(Object.fromEntries(fields)) });
-    if (requestToken !== ownerAccessToken) return;
+    if (requestToken !== ownerAccessToken || staffPanel.hidden) return;
     staffForm.reset();
     await loadStaffPanel();
-    if (requestToken !== ownerAccessToken) return;
+    if (requestToken !== ownerAccessToken || staffPanel.hidden) return;
     credentialValue.textContent = result.temporaryPassword;
     credentialBox.hidden = false;
     staffStatus.textContent = result.warning;
