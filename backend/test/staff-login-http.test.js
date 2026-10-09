@@ -569,3 +569,60 @@ test('staff password change returns recovery guidance if provider update fails a
     }
   }
 });
+
+test('Owner staff password reset revokes sessions before updating provider credentials', async () => {
+  const names=['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
+  const saved=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  const originalFetch=globalThis.fetch;
+  let server;
+  const events=[];
+  const staffId='00000000-0000-4000-8000-000000000001';
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key'
+    });
+    globalThis.fetch=async (url,options)=>{
+      assert.ok(String(url).includes('/auth/v1/admin/users/'+staffId));
+      events.push('provider-password-update');
+      assert.equal(options.method,'PUT');
+      assert.ok(JSON.parse(options.body).password.length>=12);
+      return {ok:true,json:async()=>({})};
+    };
+    const pool={query:async (sql,params)=>{
+      if(sql.includes('crm_begin_staff_password_change')){
+        events.push('database-revoke');
+        assert.equal(params[0],staffId);
+        return {rowCount:1,rows:[{}]};
+      }
+      if(sql.includes('insert into public.crm_staff_audit')){
+        events.push('owner-audit');
+        assert.equal(params[1],staffId);
+        return {rowCount:1,rows:[{}]};
+      }
+      events.push('database-active-check');
+      return {rowCount:1,rows:[{user_id:staffId}]};
+    }};
+    const app=express();
+    app.use(express.json());
+    app.use('/api/admin/staff',staffRoutes({
+      pool,requireOwner:(req,_res,next)=>{req.owner={id:'00000000-0000-4000-8000-000000000002'};next();}
+    }));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await originalFetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff/'+staffId+'/reset-password',{method:'POST'});
+    assert.equal(response.status,200);
+    assert.equal(response.headers.get('cache-control'),'no-store');
+    const body=await response.json();
+    assert.ok(body.temporaryPassword.length>=12);
+    assert.deepEqual(events,['database-active-check','database-revoke','provider-password-update','owner-audit']);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    globalThis.fetch=originalFetch;
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
