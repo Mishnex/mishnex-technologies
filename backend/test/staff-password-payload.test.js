@@ -19,3 +19,9 @@ test('owner password reset fails closed with recovery instructions', () => {
   assert.match(source, /Employee password reset could not be confirmed\. Existing sessions were revoked\./);
   assert.match(source, /Owner staff password reset requires recovery/);
 });
+
+test('Super Admin login rejects invalid provider expiry before session registration', () => {
+  const source = readFileSync(new URL('../src/staff.js', import.meta.url), 'utf8');
+  assert.match(source, /Number\.isFinite\(ttl\) \|\| ttl <= 0 \|\| ttl > 3900/);
+  assert.match(source, /Invalid session expiry\. Sign in again\./);
+});
