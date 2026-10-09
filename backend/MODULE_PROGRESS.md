@@ -73,3 +73,5 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 - Owner dashboard clears one-time employee credentials on leaving Staff and invalidates pending CRM Leads list requests on navigation; browser smoke/regression testing pending.
 
 - Staff UI ignores delayed credential/list responses when its section is hidden, in addition to sign-out token checks; browser-level regression tests still required.
+
+- Hidden-section guards added for employee deactivation responses and CRM lead list rendering; browser regression tests still pending.
