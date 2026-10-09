@@ -57,5 +57,19 @@ export function leadWorkflowRoutes({ pool, requireOwner }) {
       client?.release();
     }
   });
+  router.get('/:leadId/activity', async (req, res, next) => {
+    const parsed = z.string().uuid().safeParse(req.params.leadId);
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid lead ID.' });
+    try {
+      const result = await pool.query(
+        `SELECT a.id,a.from_status,a.to_status,a.note,a.created_at
+         FROM public.crm_lead_activity a
+         WHERE a.lead_id=$1
+         ORDER BY a.created_at DESC,a.id DESC LIMIT 100`,
+        [parsed.data]
+      );
+      return res.json({ leadId:parsed.data, activity:result.rows });
+    } catch (error) { next(error); }
+  });
   return router;
 }
