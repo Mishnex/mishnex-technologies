@@ -298,3 +298,52 @@ test('staff logout revokes database sessions before global identity-provider sig
     }
   }
 });
+
+test('staff logout reports partial failure after database revocation if provider sign-out fails', async () => {
+  const names = ['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SUPABASE_ANON_KEY'];
+  const saved = Object.fromEntries(names.map(name => [name, process.env[name]]));
+  const originalFetch = globalThis.fetch;
+  let server;
+  const events = [];
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key',
+      SUPABASE_ANON_KEY:'fake-test-only-anon-key'
+    });
+    globalThis.fetch = async url => {
+      if(String(url).includes('/auth/v1/logout')){
+        events.push('provider-logout-failed');
+        return {ok:false,status:503};
+      }
+      events.push('provider-user');
+      return {ok:true,json:async()=>({id:'00000000-0000-4000-8000-000000000001'})};
+    };
+    const pool={query:async sql=>{
+      assert.match(sql,/crm_revoke_staff_sessions_on_logout/);
+      events.push('database-revoke');
+      return {rowCount:1,rows:[{}]};
+    }};
+    const app=express();
+    app.use('/api/admin/staff',staffRoutes({pool,requireOwner:(_req,res)=>res.sendStatus(403)}));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await originalFetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff/logout',{
+      method:'POST',headers:{authorization:'Bearer test-only-token'}
+    });
+    assert.equal(response.status,502);
+    assert.equal(response.headers.get('cache-control'),'no-store');
+    const body=await response.json();
+    assert.equal(body.signedOut,false);
+    assert.match(body.error,/Local session revoked/);
+    assert.deepEqual(events,['provider-user','database-revoke','provider-logout-failed']);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    globalThis.fetch=originalFetch;
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
