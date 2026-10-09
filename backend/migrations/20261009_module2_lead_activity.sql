@@ -10,14 +10,14 @@ ALTER TABLE public.crm_leads
 
 ALTER TABLE public.crm_leads
   ADD CONSTRAINT crm_leads_status_check
-  CHECK (status IN ('new','contacted','qualified','proposal','won','lost'));
+  CHECK (status IN ('new','contacted','qualified','proposal','won','lost','closed'));
 
 CREATE TABLE IF NOT EXISTS public.crm_lead_activity (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   lead_id uuid NOT NULL REFERENCES public.crm_leads(id) ON DELETE RESTRICT,
   actor_id uuid NOT NULL,
-  from_status text NOT NULL CHECK (from_status IN ('new','contacted','qualified','proposal','won','lost')),
-  to_status text NOT NULL CHECK (to_status IN ('new','contacted','qualified','proposal','won','lost')),
+  from_status text NOT NULL CHECK (from_status IN ('new','contacted','qualified','proposal','won','lost','closed')),
+  to_status text NOT NULL CHECK (to_status IN ('new','contacted','qualified','proposal','won','lost','closed')),
   note text CHECK (note IS NULL OR (char_length(btrim(note)) BETWEEN 1 AND 2000)),
   created_at timestamptz NOT NULL DEFAULT now()
 );
