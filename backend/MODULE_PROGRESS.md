@@ -33,7 +33,7 @@ Implemented in development:
 **Outstanding:**
 - [ ] Review migration against all existing lead statuses and data, then test on isolated staging
 - [ ] Real PostgreSQL transaction and concurrent-update tests
-- [ ] Connect Owner dashboard to lead status and follow-up history endpoints
+- [ ] Connect Owner dashboard to lead status update and follow-up history endpoints (read-only list/filter connected)
 - [ ] Add lead assignment, filtering and client conversion design and implementation
 - [ ] Implement client management and tests, including permissions and audit requirements
 - [ ] Owner acceptance and rollback plan before enabling `LEAD_WORKFLOW_ENABLED`
