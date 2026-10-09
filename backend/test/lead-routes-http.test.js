@@ -59,3 +59,24 @@ test('lead update rejects invalid transition without writes',async()=>{
   assert.equal(result.status,409);
   assert.deepEqual(result.calls.map(call=>call.sql.split(' ')[0]),['BEGIN','SELECT','ROLLBACK']);
 });
+
+test('lead activity history rejects requests when feature disabled',async()=>{
+  const previous=process.env.LEAD_WORKFLOW_ENABLED;
+  process.env.LEAD_WORKFLOW_ENABLED='false';
+  const app=express();
+  app.use('/api/admin/lead-workflow',leadWorkflowRoutes({
+    pool:{query:async()=>{throw Error('Database must not be called');}},
+    requireOwner:(_req,_res,next)=>next()
+  }));
+  const server=app.listen(0,'127.0.0.1');
+  try {
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/lead-workflow/'+leadId+'/activity');
+    assert.equal(response.status,503);
+    assert.equal(response.headers.get('cache-control'),'no-store');
+  } finally {
+    await new Promise(resolve=>server.close(resolve));
+    if(previous===undefined) delete process.env.LEAD_WORKFLOW_ENABLED;
+    else process.env.LEAD_WORKFLOW_ENABLED=previous;
+  }
+});
