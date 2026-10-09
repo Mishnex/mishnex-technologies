@@ -15,6 +15,7 @@ function signOut() {
   adminApp.hidden = true;
   loginScreen.hidden = false;
   loginForm.reset();
+  document.getElementById('loginSubmit').disabled = false;
   loginMessage.textContent = '';
   document.getElementById('liveLeads')?.remove();
   document.querySelector('#overview .empty')?.replaceChildren();
