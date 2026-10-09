@@ -802,3 +802,66 @@ test('Owner employee deactivation skips audit for already inactive account', asy
     }
   }
 });
+
+test('Owner creates employee only after Auth, staff row and audit transaction succeed', async () => {
+  const names=['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
+  const saved=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  const originalFetch=globalThis.fetch;
+  let server;
+  const events=[];
+  const staffId='00000000-0000-4000-8000-000000000001';
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key'
+    });
+    globalThis.fetch=async (_url,options)=>{
+      events.push('provider-create');
+      const body=JSON.parse(options.body);
+      assert.equal(body.email,'staff@example.com');
+      assert.equal(body.email_confirm,true);
+      assert.equal(body.app_metadata.mishnex_role,'sales');
+      return {ok:true,json:async()=>({id:staffId})};
+    };
+    const client={
+      query:async sql=>{
+        if(sql==='BEGIN') events.push('database-begin');
+        else if(sql.includes('insert into public.crm_staff(')) events.push('database-staff-insert');
+        else if(sql.includes('staff_created')) events.push('database-audit');
+        else if(sql==='COMMIT') events.push('database-commit');
+        else events.push(sql);
+        return {rowCount:1,rows:[]};
+      },
+      release:()=>{}
+    };
+    const app=express();
+    app.use(express.json());
+    app.use('/api/admin/staff',staffRoutes({
+      pool:{connect:async()=>client},
+      requireOwner:(req,_res,next)=>{req.owner={id:'00000000-0000-4000-8000-000000000002'};next();}
+    }));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await originalFetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({email:'staff@example.com',fullName:'Test Employee',role:'sales'})
+    });
+    assert.equal(response.status,201);
+    assert.equal(response.headers.get('cache-control'),'no-store');
+    const body=await response.json();
+    assert.equal(body.staff.userId,staffId);
+    assert.equal(body.staff.mustChangePassword,true);
+    assert.ok(body.temporaryPassword.length>=12);
+    assert.deepEqual(events,[
+      'provider-create','database-begin','database-staff-insert','database-audit','database-commit'
+    ]);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    globalThis.fetch=originalFetch;
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
