@@ -13,3 +13,10 @@ select action, count(*) as events
 from public.crm_staff_audit
 group by action
 order by action;
+
+-- Always returns a single summary row, even when the audit table is empty.
+select count(*) as total_events,
+       count(*) filter (where action='staff_created') as staff_created_events,
+       count(*) filter (where action='staff_password_reset') as password_reset_events,
+       count(*) filter (where action='staff_deactivated') as deactivation_events
+from public.crm_staff_audit;
