@@ -28,6 +28,7 @@ Implemented in development:
 - [x] Owner-only status update endpoint using row lock, transaction and activity insert
 - [x] Owner-only activity history endpoint with existence check and 100-row limit
 - [x] Feature-gated HTTP tests for update, history, authorization and rollback
+- [x] Owner lead list includes status and supports validated status filtering
 
 **Outstanding:**
 - [ ] Review migration against all existing lead statuses and data, then test on isolated staging
