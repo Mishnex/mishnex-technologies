@@ -71,3 +71,5 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 - Owner lead status updates now ignore delayed responses after sign-out and display the API's uncertain-COMMIT warning instead of falsely claiming no changes were saved. Browser regression test pending.
 
 - Owner dashboard clears one-time employee credentials on leaving Staff and invalidates pending CRM Leads list requests on navigation; browser smoke/regression testing pending.
+
+- Staff UI ignores delayed credential/list responses when its section is hidden, in addition to sign-out token checks; browser-level regression tests still required.
