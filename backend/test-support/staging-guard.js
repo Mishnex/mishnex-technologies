@@ -14,6 +14,9 @@ export function assertStagingTarget(env) {
     throw new Error('Staging Supabase project mismatch');
   }
   if (!env.STAGING_SUPABASE_PROJECT_ID) throw new Error('Explicit staging Supabase project ID required');
+  if (env.STAGING_ENVIRONMENT_NAME !== 'mishnex-crm-isolated-test') {
+    throw new Error('Explicit isolated staging environment identity required');
+  }
   if (!env.STAGING_DATABASE_HOST || database.hostname !== env.STAGING_DATABASE_HOST) {
     throw new Error('Explicit staging database host mismatch');
   }
