@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 
 // All routes are Owner-only until staff RBAC and session enforcement are implemented.
@@ -37,8 +38,16 @@ export function staffRoutes({ pool, requireOwner }) {
       return Number.isInteger(payload.iat) && payload.iat + 1 >= Math.floor(new Date(cutoff).getTime() / 1000);
     } catch { return false; }
   }
+  const staffLoginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-7',
+    legacyHeaders: false, message: { error: 'Too many sign-in attempts. Try again later.' }
+  });
+  const passwordChangeLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-7',
+    legacyHeaders: false, message: { error: 'Too many password changes. Try again later.' }
+  });
   // Temporary-password login is restricted to password setup; it never grants CRM module access.
-  router.post('/login', async (req, res, next) => {
+  router.post('/login', staffLoginLimiter, async (req, res, next) => {
     if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error:'Staff login is disabled.' });
     const parsed = z.object({ email:z.string().email().max(254), password:z.string().min(1).max(1024) }).strict().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error:'Enter valid credentials.' });
@@ -86,7 +95,7 @@ export function staffRoutes({ pool, requireOwner }) {
     } catch (error) { next(error); }
   });
   // Self-service first-login password change. Does not grant staff CRM access.
-  router.post('/change-password', async (req, res, next) => {
+  router.post('/change-password', passwordChangeLimiter, async (req, res, next) => {
     if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error: 'Staff access is not enabled.' });
     const match = /^Bearer (\\S+)$/.exec(req.get('Authorization') || '');
     if (!match) return res.status(401).json({ error: 'Sign in first.' });
