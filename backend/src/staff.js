@@ -30,6 +30,27 @@ export function staffRoutes({ pool, requireOwner }) {
     }
     return data;
   }
+  // Self-service first-login password change. Does not grant staff CRM access.
+  router.post('/change-password', async (req, res, next) => {
+    if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error: 'Staff access is not enabled.' });
+    const match = /^Bearer (\\S+)$/.exec(req.get('Authorization') || '');
+    if (!match) return res.status(401).json({ error: 'Sign in first.' });
+    const parsed = z.object({ newPassword: z.string().min(12).max(128) }).strict().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'New password must contain 12 to 128 characters.' });
+    try {
+      const response = await fetch(new URL('/auth/v1/user', process.env.SUPABASE_URL), {
+        headers: { apikey: process.env.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + match[1] },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!response.ok) return res.status(401).json({ error: 'Invalid or expired session.' });
+      const user = await response.json();
+      const staff = await pool.query('select is_active from public.crm_staff where user_id=$1', [user.id]);
+      if (!staff.rowCount || !staff.rows[0].is_active) return res.status(403).json({ error: 'Active staff account required.' });
+      await adminApi('users/' + encodeURIComponent(user.id), 'PUT', { password: parsed.data });
+      await pool.query('update public.crm_staff set must_change_password=false, updated_at=now() where user_id=$1', [user.id]);
+      res.set('Cache-Control', 'no-store').json({ changed: true, message: 'Password updated. Sign in again.' });
+    } catch (error) { next(error); }
+  });
   router.use(requireOwner);
   router.use((_req, res, next) => configured() ? next() : res.status(503).json({ error: 'Staff provisioning is not configured.' }));
 
