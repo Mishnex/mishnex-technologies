@@ -89,3 +89,5 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 - Mocked HTTP transaction test now verifies activity INSERT failure prevents COMMIT, triggers ROLLBACK after status UPDATE, and releases a healthy connection for reuse. Real staging PostgreSQL atomicity validation still pending.
 
 - Mocked HTTP regression verifies a missing lead returns 404 after SELECT FOR UPDATE, rolls back without status/activity writes, and releases a healthy DB client. Real staging DB tests remain required.
+
+- Module 1 Owner dashboard login race: only the currently active login request may re-enable the submit button. Browser-level overlapping-login regression testing remains pending.
