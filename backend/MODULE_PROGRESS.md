@@ -77,3 +77,5 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 - Hidden-section guards added for employee deactivation responses and CRM lead list rendering; browser regression tests still pending.
 
 - Lead follow-up history responses now require their card to remain in the visible current lead list; stale history callbacks after refresh/navigation are ignored. Browser regression tests pending.
+
+- Lead status save callbacks now ignore results when their card is no longer visible/current after refresh or navigation. Browser regression test remains pending.
