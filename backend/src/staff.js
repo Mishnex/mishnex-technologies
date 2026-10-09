@@ -183,6 +183,33 @@ export function staffRoutes({ pool, requireOwner }) {
       next(error);
     }
   });
+  // Owner can suspend an employee immediately. Every staff request checks is_active.
+  router.post('/:userId/deactivate', async (req, res, next) => {
+    if (!uuidSchema.safeParse(req.params.userId).success) return res.status(400).json({ error:'Invalid staff ID.' });
+    const id = req.params.userId;
+    const client = await pool.connect().catch(next);
+    if (!client) return;
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        'update public.crm_staff set is_active=false, sessions_valid_after=now(), updated_at=now() where user_id=$1 and is_active=true returning user_id,role',
+        [id]
+      );
+      if (!result.rowCount) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error:'Active employee not found.' });
+      }
+      await client.query(
+        "insert into public.crm_staff_audit(actor_id,target_id,action,detail) values ($1,$2,'staff_deactivated',$3)",
+        [req.owner.id,id,JSON.stringify({ role:result.rows[0].role })]
+      );
+      await client.query('COMMIT');
+      res.set('Cache-Control','no-store').json({ deactivated:true });
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      next(error);
+    } finally { client.release(); }
+  });
   router.post('/:userId/reset-password', async (req, res, next) => {
     if (!uuidSchema.safeParse(req.params.userId).success) return res.status(400).json({ error:'Invalid staff ID.' });
     const id = req.params.userId;
