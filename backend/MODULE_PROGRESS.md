@@ -65,3 +65,5 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 - CRM Leads filter now uses request sequencing so an older HTTP response cannot overwrite newer filtered results; browser race testing remains pending.
 
 - Owner employee creation, password reset and deactivation UI now ignore delayed responses from an expired/signed-out Owner session; browser race regression test remains pending.
+
+- Owner login now invalidates in-flight login responses on sign-out, preventing a delayed response from restoring a session; browser-level race test remains pending.
