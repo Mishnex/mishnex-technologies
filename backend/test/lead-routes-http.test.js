@@ -300,3 +300,37 @@ test('lead activity insert failure rolls back the status update and reuses healt
     else process.env.LEAD_WORKFLOW_ENABLED=previous;
   }
 });
+
+test('missing lead returns 404 and closes transaction without writing activity',async()=>{
+  const previous=process.env.LEAD_WORKFLOW_ENABLED;
+  process.env.LEAD_WORKFLOW_ENABLED='true';
+  const calls=[],releases=[];
+  const client={
+    query:async sql=>{
+      calls.push(sql);
+      if(sql.startsWith('SELECT status'))return {rowCount:0,rows:[]};
+      return {rowCount:1,rows:[]};
+    },
+    release:broken=>releases.push(broken)
+  };
+  const app=express();
+  app.use(express.json());
+  app.use('/api/admin/lead-workflow',leadWorkflowRoutes({
+    pool:{connect:async()=>client},
+    requireOwner:(req,_res,next)=>{req.owner={id:ownerId};next();}
+  }));
+  const server=app.listen(0,'127.0.0.1');
+  try{
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/lead-workflow/'+leadId+'/status',{
+      method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({status:'contacted'})
+    });
+    assert.equal(response.status,404);
+    assert.deepEqual(calls.map(sql=>sql.split(' ')[0]),['BEGIN','SELECT','ROLLBACK']);
+    assert.deepEqual(releases,[false]);
+  }finally{
+    await new Promise(resolve=>server.close(resolve));
+    if(previous===undefined)delete process.env.LEAD_WORKFLOW_ENABLED;
+    else process.env.LEAD_WORKFLOW_ENABLED=previous;
+  }
+});
