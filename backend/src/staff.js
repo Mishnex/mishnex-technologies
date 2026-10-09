@@ -35,8 +35,10 @@ export function staffRoutes({ pool, requireOwner }) {
   function tokenIssuedAfterCutoff(accessToken, cutoff) {
     try {
       const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64url').toString('utf8'));
-      // JWT iat is second-resolution; allow a one-second boundary for cutoff timestamps.
-      return Number.isInteger(payload.iat) && payload.iat + 1 >= Math.floor(new Date(cutoff).getTime() / 1000);
+      const cutoffSeconds = new Date(cutoff).getTime() / 1000;
+      // JWT iat is second-resolution. Fail closed for tokens issued in the cutoff second.
+      // A fresh login may need to wait until the next second after a password reset.
+      return Number.isInteger(payload.iat) && Number.isFinite(cutoffSeconds) && payload.iat > Math.floor(cutoffSeconds);
     } catch { return false; }
   }
   const staffLoginLimiter = rateLimit({
