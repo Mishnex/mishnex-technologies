@@ -186,6 +186,15 @@ export function staffRoutes({ pool, requireOwner }) {
         'update public.crm_super_admin_sessions set revoked_at=now() where user_id=$1 and token_fingerprint=$2 and revoked_at is null',
         [user.id,fingerprint(match[1])]
       );
+      // Supabase logout invalidates the provider-side refresh session as well.
+      const logoutResponse = await fetch(new URL('/auth/v1/logout', process.env.SUPABASE_URL), {
+        method:'POST',
+        headers:{ apikey:process.env.SUPABASE_ANON_KEY, Authorization:'Bearer ' + match[1] },
+        signal:AbortSignal.timeout(8000)
+      });
+      if (!logoutResponse.ok) return res.status(502).set('Cache-Control','no-store').json({
+        signedOut:false, error:'Local session revoked; identity provider logout could not be confirmed.'
+      });
       res.set('Cache-Control','no-store').json({ signedOut:true });
     } catch (error) { next(error); }
   });
