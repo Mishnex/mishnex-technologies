@@ -1638,3 +1638,47 @@ test('Owner employee creation rejects Auth success without user ID before databa
     }
   }
 });
+
+test('Owner employee provisioning rejects malformed Auth user ID before database access', async () => {
+  const names=['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
+  const saved=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  const originalFetch=globalThis.fetch;
+  let server;
+  let databaseCalls=0;
+  const providerMethods=[];
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key'
+    });
+    globalThis.fetch=async (_url,options)=>{
+      providerMethods.push(options.method);
+      return {ok:true,json:async()=>({id:'invalid-user-id'})};
+    };
+    const app=express();
+    app.use(express.json());
+    app.use('/api/admin/staff',staffRoutes({
+      pool:{connect:async()=>{databaseCalls++;throw new Error('Unexpected database access');}},
+      requireOwner:(req,_res,next)=>{req.owner={id:'00000000-0000-4000-8000-000000000002'};next();}
+    }));
+    app.use((_err,_req,res,_next)=>res.status(503).json({error:'Provisioning could not be confirmed.'}));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await originalFetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({email:'staff@example.com',fullName:'Test Employee',role:'sales'})
+    });
+    assert.equal(response.status,503);
+    assert.equal((await response.json()).temporaryPassword,undefined);
+    assert.equal(databaseCalls,0);
+    assert.deepEqual(providerMethods,['POST','DELETE']);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    globalThis.fetch=originalFetch;
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
