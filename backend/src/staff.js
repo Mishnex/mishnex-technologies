@@ -42,19 +42,6 @@ export function staffRoutes({ pool, requireOwner }) {
     windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-7',
     legacyHeaders: false, message: { error: 'Too many password changes. Try again later.' }
   });
-  // Central deny-by-default role policy for future CRM endpoints.
-  // Permissions are never inferred from client-supplied role values.
-  const rolePermissions = Object.freeze({
-    super_admin: ['leads:read','leads:manage','quotations:read','quotations:manage','projects:read','projects:manage','payments:read','reports:read'],
-    manager: ['leads:read','leads:manage','quotations:read','quotations:manage','projects:read','projects:manage','reports:read'],
-    sales: ['leads:read','quotations:read'],
-    developer: ['projects:read'],
-    accountant: ['payments:read','reports:read']
-  });
-  function permissionsFor(staff) {
-    if (!staff.is_active || staff.must_change_password) return [];
-    return rolePermissions[staff.role] || [];
-  }
   // Authenticated identity must be checked against the live staff record on every request.
   async function requireStaffPermission(permission, req, res, next) {
     if (process.env.STAFF_CRM_ENABLED !== 'true') return res.status(503).json({ error:'Staff CRM modules are disabled.' });
