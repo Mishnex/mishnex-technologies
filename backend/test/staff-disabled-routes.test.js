@@ -35,3 +35,32 @@ test('staff CRM and login endpoints stay disabled by default', async () => {
     else process.env.STAFF_CRM_ENABLED = previousCrm;
   }
 });
+
+test('CRM data stays blocked when account management is enabled', async () => {
+  const previousManagement = process.env.STAFF_MANAGEMENT_ENABLED;
+  const previousCrm = process.env.STAFF_CRM_ENABLED;
+  process.env.STAFF_MANAGEMENT_ENABLED = 'true';
+  process.env.STAFF_CRM_ENABLED = 'false';
+  const app = express();
+  app.use('/api/admin/staff', staffRoutes({
+    pool: { query: async () => { throw new Error('DB must not be accessed'); } },
+    requireOwner: (_req, res) => res.sendStatus(403)
+  }));
+  const server = app.listen(0, '127.0.0.1');
+  try {
+    await new Promise(resolve => server.once('listening', resolve));
+    const base = 'http://127.0.0.1:' + server.address().port;
+    for (const path of ['/leads', '/permissions/check/leads']) {
+      const response = await fetch(base + '/api/admin/staff' + path, {
+        headers: { authorization: 'Bearer placeholder' }
+      });
+      assert.equal(response.status, 503, path);
+    }
+  } finally {
+    await new Promise((resolve, reject) => server.close(err => err ? reject(err) : resolve()));
+    if (previousManagement === undefined) delete process.env.STAFF_MANAGEMENT_ENABLED;
+    else process.env.STAFF_MANAGEMENT_ENABLED = previousManagement;
+    if (previousCrm === undefined) delete process.env.STAFF_CRM_ENABLED;
+    else process.env.STAFF_CRM_ENABLED = previousCrm;
+  }
+});
