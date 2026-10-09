@@ -108,3 +108,10 @@ test('lead activity history returns 404 for unknown lead without reading activit
     else process.env.LEAD_WORKFLOW_ENABLED=previous;
   }
 });
+
+test('same-status follow-up saves activity without redundant lead update',async()=>{
+  const result=await request({enabled:true,body:{status:'new',note:'Called; awaiting reply'}});
+  assert.equal(result.status,200);
+  assert.deepEqual(result.calls.map(call=>call.sql.split(' ')[0]),['BEGIN','SELECT','INSERT','COMMIT']);
+  assert.deepEqual(result.calls[2].params,[leadId,ownerId,'new','new','Called; awaiting reply']);
+});
