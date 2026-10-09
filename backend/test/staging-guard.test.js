@@ -49,3 +49,15 @@ test('rejects malformed staging URLs before any connection', () => {
   assert.throws(() => assertStagingTarget({ ...valid(), SUPABASE_URL: 'not-a-url' }));
   assert.throws(() => assertStagingTarget({ ...valid(), DATABASE_URL: 'not-a-url' }));
 });
+
+test('rejects lookalike Supabase domains and Auth URL credentials', () => {
+  for (const url of [
+    'https://stagingproject.attacker.example',
+    'https://stagingproject.supabase.co.attacker.example',
+    'https://user:secret@stagingproject.supabase.co',
+    'https://stagingproject.supabase.co/auth/v1',
+    'https://stagingproject.supabase.co?token=secret'
+  ]) {
+    assert.throws(() => assertStagingTarget({ ...valid(), SUPABASE_URL: url }), url);
+  }
+});
