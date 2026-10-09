@@ -175,3 +175,55 @@ test('lead status validation rejects unexpected fields, invalid statuses and ove
     assert.deepEqual(result.releases,[],'invalid payload must not acquire a connection');
   }
 });
+
+test('lead activity history returns ordered records only for the requested lead',async()=>{
+  const previous=process.env.LEAD_WORKFLOW_ENABLED;
+  process.env.LEAD_WORKFLOW_ENABLED='true';
+  const queries=[];
+  const expected=[{id:8,from_status:'new',to_status:'contacted',note:'Called',created_at:'2026-10-09T12:00:00Z'}];
+  const app=express();
+  app.use('/api/admin/lead-workflow',leadWorkflowRoutes({
+    pool:{query:async(sql,params)=>{
+      queries.push({sql,params});
+      if(sql.startsWith('SELECT 1 FROM public.crm_leads'))return {rowCount:1,rows:[{one:1}]};
+      return {rowCount:1,rows:expected};
+    }},
+    requireOwner:(req,_res,next)=>{req.owner={id:ownerId};next();}
+  }));
+  const server=app.listen(0,'127.0.0.1');
+  try{
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/lead-workflow/'+leadId+'/activity');
+    assert.equal(response.status,200);
+    assert.equal(response.headers.get('cache-control'),'no-store');
+    assert.deepEqual(await response.json(),{leadId,activity:expected});
+    assert.equal(queries.length,2);
+    assert.deepEqual(queries.map(query=>query.params),[[leadId],[leadId]]);
+    assert.match(queries[1].sql,/ORDER BY a.created_at DESC,a.id DESC LIMIT 100/);
+  }finally{
+    await new Promise(resolve=>server.close(resolve));
+    if(previous===undefined)delete process.env.LEAD_WORKFLOW_ENABLED;
+    else process.env.LEAD_WORKFLOW_ENABLED=previous;
+  }
+});
+
+test('non-owner cannot read lead activity or trigger database queries',async()=>{
+  const previous=process.env.LEAD_WORKFLOW_ENABLED;
+  process.env.LEAD_WORKFLOW_ENABLED='true';
+  const app=express();
+  app.use('/api/admin/lead-workflow',leadWorkflowRoutes({
+    pool:{query:async()=>{throw Error('Unauthorized database access');}},
+    requireOwner:(_req,res)=>res.status(403).json({error:'Owner only'})
+  }));
+  const server=app.listen(0,'127.0.0.1');
+  try{
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/lead-workflow/'+leadId+'/activity');
+    assert.equal(response.status,403);
+    assert.equal((await response.json()).error,'Owner only');
+  }finally{
+    await new Promise(resolve=>server.close(resolve));
+    if(previous===undefined)delete process.env.LEAD_WORKFLOW_ENABLED;
+    else process.env.LEAD_WORKFLOW_ENABLED=previous;
+  }
+});
