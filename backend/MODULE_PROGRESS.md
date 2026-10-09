@@ -63,3 +63,5 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 - Fixed Owner dashboard navigation wiring: CRM Leads menu now invokes lead loading and hides unrelated module panels. Browser smoke test remains pending.
 
 - CRM Leads filter now uses request sequencing so an older HTTP response cannot overwrite newer filtered results; browser race testing remains pending.
+
+- Owner employee creation, password reset and deactivation UI now ignore delayed responses from an expired/signed-out Owner session; browser race regression test remains pending.
