@@ -13,6 +13,7 @@ test('provisioning never deletes Auth after ambiguous COMMIT, but cleans up a de
   let scenario='ambiguous';
   let deletes=0;
   let commits=0;
+  const releases=[];
   try {
     Object.assign(process.env,{STAFF_MANAGEMENT_ENABLED:'true',SUPABASE_URL:'https://isolated-staff-test.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'fake-test-key'});
     globalThis.fetch=async (url,options)=>{
@@ -28,7 +29,7 @@ test('provisioning never deletes Auth after ambiguous COMMIT, but cleans up a de
           if(scenario==='precommit' && sql.includes('insert into public.crm_staff(')) throw Object.assign(new Error('constraint failure'),{code:'23505'});
           return {rowCount:1,rows:[]};
         },
-        release:()=>{}
+        release:broken=>releases.push(broken)
       })
     };
     const app=express();
@@ -44,11 +45,13 @@ test('provisioning never deletes Auth after ambiguous COMMIT, but cleans up a de
     assert.match((await ambiguous.json()).error,/outcome is uncertain/i);
     assert.equal(deletes,0,'Auth identity must survive uncertain COMMIT');
     assert.equal(commits,1);
+    assert.deepEqual(releases,[true],'ambiguous COMMIT connection must be discarded');
     scenario='precommit';
     const rejected=await post();
     assert.equal(rejected.status,409);
     assert.equal(deletes,1,'definite pre-commit failure can clean up Auth');
     assert.equal(commits,1);
+    assert.deepEqual(releases,[true,false],'successful rollback can return connection to pool');
   } finally {
     if(server)await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
     globalThis.fetch=originalFetch;
