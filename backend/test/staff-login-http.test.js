@@ -1366,3 +1366,42 @@ test('Owner password reset rejects non-Owner requests before revocation or Auth 
     }
   }
 });
+
+test('Owner cannot reset password for inactive employee or mutate Auth sessions', async () => {
+  const names=['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
+  const saved=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  const originalFetch=globalThis.fetch;
+  let server;
+  let providerCalls=0;
+  const statements=[];
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key'
+    });
+    globalThis.fetch=async()=>{providerCalls++;throw new Error('Unexpected Auth access');};
+    const app=express();
+    app.use('/api/admin/staff',staffRoutes({
+      pool:{query:async sql=>{
+        statements.push(sql);
+        return {rowCount:0,rows:[]};
+      }},
+      requireOwner:(req,_res,next)=>{req.owner={id:'00000000-0000-4000-8000-000000000002'};next();}
+    }));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await originalFetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff/00000000-0000-4000-8000-000000000001/reset-password',{method:'POST'});
+    assert.equal(response.status,404);
+    assert.equal(providerCalls,0);
+    assert.equal(statements.length,1);
+    assert.match(statements[0],/where user_id=\$1 and is_active=true/);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    globalThis.fetch=originalFetch;
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
