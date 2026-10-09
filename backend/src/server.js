@@ -18,7 +18,7 @@ if (!process.env.DATABASE_URL || !allowedOrigins.length) {
 }
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : undefined
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true, ...(process.env.DATABASE_CA_CERT ? { ca: process.env.DATABASE_CA_CERT.replace(/\\n/g, '\n') } : {}) } : undefined
 });
 app.use(cors({
   origin(origin, cb) {
