@@ -22,6 +22,7 @@ export function leadWorkflowRoutes({ pool, requireOwner }) {
       return res.status(400).json({ error: 'Invalid lead status update.' });
     }
     let client;
+    let commitAttempted = false;
     try {
       client = await pool.connect();
       await client.query('BEGIN');
@@ -50,6 +51,7 @@ export function leadWorkflowRoutes({ pool, requireOwner }) {
         'INSERT INTO public.crm_lead_activity(lead_id,actor_id,from_status,to_status,note) VALUES ($1,$2,$3,$4,$5)',
         [leadId.data, req.owner.id, from, parsed.data.status, parsed.data.note ?? null]
       );
+      commitAttempted = true;
       await client.query('COMMIT');
       return res.json({ leadId:leadId.data, fromStatus:from, status:parsed.data.status });
     } catch (error) {
@@ -58,6 +60,9 @@ export function leadWorkflowRoutes({ pool, requireOwner }) {
           console.error('Lead status rollback failed:', rollbackError.message);
         }
       }
+      if (commitAttempted) return res.status(503).json({
+        error: 'Lead update outcome is uncertain. Refresh the lead and its activity history before attempting another update.'
+      });
       next(error);
     } finally {
       client?.release();
