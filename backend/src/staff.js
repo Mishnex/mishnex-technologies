@@ -161,6 +161,7 @@ export function staffRoutes({ pool, requireOwner }) {
       if (!tokenIssuedAfterCutoff(match[1], staff.rows[0].sessions_valid_after)) return res.status(401).json({ error:'Session revoked. Sign in again.' });
       await adminApi('users/' + encodeURIComponent(user.id), 'PUT', { password: parsed.data });
       await pool.query('update public.crm_staff set must_change_password=false, sessions_valid_after=now(), updated_at=now() where user_id=$1', [user.id]);
+      await pool.query('update public.crm_super_admin_sessions set revoked_at=now() where user_id=$1 and revoked_at is null', [user.id]);
       res.set('Cache-Control', 'no-store').json({ changed: true, message: 'Password updated. Sign in again.' });
     } catch (error) { next(error); }
   });
@@ -238,6 +239,7 @@ export function staffRoutes({ pool, requireOwner }) {
         "insert into public.crm_staff_audit(actor_id,target_id,action,detail) values ($1,$2,'staff_deactivated',$3)",
         [req.owner.id,id,JSON.stringify({ role:result.rows[0].role })]
       );
+      await client.query('update public.crm_super_admin_sessions set revoked_at=now() where user_id=$1 and revoked_at is null', [id]);
       await client.query('COMMIT');
       res.set('Cache-Control','no-store').json({ deactivated:true });
     } catch (error) {
@@ -254,6 +256,7 @@ export function staffRoutes({ pool, requireOwner }) {
       const password = secret();
       await adminApi('users/' + encodeURIComponent(id), 'PUT', { password });
       await pool.query('update public.crm_staff set must_change_password=true,sessions_valid_after=now(),updated_at=now() where user_id=$1',[id]);
+      await pool.query('update public.crm_super_admin_sessions set revoked_at=now() where user_id=$1 and revoked_at is null',[id]);
       await pool.query(
         "insert into public.crm_staff_audit(actor_id,target_id,action,detail) values ($1,$2,'staff_password_reset',$3)",
         [req.owner.id,id,JSON.stringify({ method:'owner_manual' })]
