@@ -88,3 +88,51 @@ test('stale successful Owner login cannot replace the newer authenticated sessio
   assert.equal(context.ownerAccessToken,'newer-token','older successful response must not replace active credentials');
   assert.equal(leadsLoaded,1,'stale response must not trigger an extra lead request');
 });
+
+test('sign-out resets disabled login and invalidates an outstanding login response',async()=>{
+  const source=readFileSync(new URL('../../assets/js/admin.js',import.meta.url),'utf8');
+  const signoutStart=source.indexOf('function signOut() {');
+  const signoutEnd=source.indexOf("\ndocument.getElementById('signOutButton')",signoutStart);
+  const loginStart=source.indexOf("loginForm.addEventListener('submit', async event => {");
+  const loginEnd=source.indexOf("\nasync function loadLeads()",loginStart);
+  assert.ok(signoutStart>=0&&signoutEnd>signoutStart&&loginStart>=0&&loginEnd>loginStart);
+  let resolveFetch;
+  const submit={disabled:false};
+  const loginMessage={textContent:''};
+  const loginScreen={hidden:false};
+  const adminApp={hidden:true};
+  const loginForm={reset(){},addEventListener(_name,handler){this.handler=handler;}};
+  const empty={replaceChildren(){}};
+  const context={
+    loginForm,loginMessage,loginScreen,adminApp,
+    ownerLoginRequestId:0,ownerAccessToken:null,leadListRequestId:0,
+    apiOrigin:'https://example.invalid',
+    leadResults:empty,staffList:empty,staffStatus:{textContent:''},leadFeedback:{textContent:''},
+    credentialBox:{hidden:false},credentialValue:{textContent:'sensitive'},
+    staffPanel:{hidden:false},leadPanel:{hidden:false},
+    document:{
+      getElementById(id){
+        if(id==='loginSubmit')return submit;
+        if(id==='ownerEmail')return {value:'owner@example.com'};
+        if(id==='ownerPassword')return {value:'password'};
+        if(id==='liveLeads')return null;
+        throw Error('Unexpected DOM ID: '+id);
+      },
+      querySelector(){return null;}
+    },
+    fetch:()=>new Promise(resolve=>{resolveFetch=resolve;}),
+    loadLeads:async()=>{}
+  };
+  vm.createContext(context);
+  vm.runInContext(source.slice(signoutStart,signoutEnd)+'\n'+source.slice(loginStart,loginEnd),context);
+  const pending=context.loginForm.handler({preventDefault(){}});
+  assert.equal(submit.disabled,true);
+  vm.runInContext('signOut()',context);
+  assert.equal(submit.disabled,false,'logout should leave login form usable');
+  assert.equal(credentialValue.textContent,'','logout clears temporary credentials');
+  resolveFetch({ok:true,json:async()=>({accessToken:'expired-login-response'})});
+  await pending;
+  assert.equal(context.ownerAccessToken,null,'late response must not restore a logged-out session');
+  assert.equal(adminApp.hidden,true);
+  assert.equal(submit.disabled,false);
+});
