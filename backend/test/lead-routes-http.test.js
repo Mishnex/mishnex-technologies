@@ -161,3 +161,17 @@ test('lead COMMIT acknowledgement failure returns uncertain outcome instead of c
     else process.env.LEAD_WORKFLOW_ENABLED=previous;
   }
 });
+
+test('lead status validation rejects unexpected fields, invalid statuses and oversized notes before DB access',async()=>{
+  for(const body of [
+    {status:'contacted',note:'ok',actor_id:ownerId},
+    {status:'unreviewed'},
+    {status:'contacted',note:'x'.repeat(2001)},
+    {status:'contacted',note:'   '}
+  ]){
+    const result=await request({enabled:true,body});
+    assert.equal(result.status,400,JSON.stringify(body).slice(0,100));
+    assert.deepEqual(result.calls,[],'invalid payload must not begin a transaction');
+    assert.deepEqual(result.releases,[],'invalid payload must not acquire a connection');
+  }
+});
