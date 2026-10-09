@@ -361,10 +361,10 @@ async function loadLeadPanel(){
             headers:{Authorization:'Bearer '+ownerAccessToken,'Content-Type':'application/json'},
             body:JSON.stringify(payload)
           });
-          if(requestToken!==ownerAccessToken)return;
+          if(requestToken!==ownerAccessToken||leadPanel.hidden||!leadResults.contains(item))return;
           if(response.status===401||response.status===403){signOut();return;}
           const data=await response.json().catch(()=>({}));
-          if(requestToken!==ownerAccessToken)return;
+          if(requestToken!==ownerAccessToken||leadPanel.hidden||!leadResults.contains(item))return;
           if(response.status===503){
             updateFeedback.textContent=data.error||'Lead updates are not enabled yet.';
           }else if(!response.ok){
@@ -377,7 +377,7 @@ async function loadLeadPanel(){
             noteInput.value='';
             history.hidden=true;
           }
-        }catch(error){if(requestToken===ownerAccessToken)updateFeedback.textContent='Unable to save follow-up.';}
+        }catch(error){if(requestToken===ownerAccessToken&&!leadPanel.hidden&&leadResults.contains(item))updateFeedback.textContent='Unable to save follow-up.';}
         finally{saveButton.disabled=false;}
       });
       item.append(historyButton,history,updateForm);
