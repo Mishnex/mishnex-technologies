@@ -52,3 +52,6 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 
 ## Latest reliability safeguard
 - Employee provisioning no longer deletes the Auth identity after a database COMMIT attempt with an uncertain result. Manual reconciliation and real database failure-path tests are still required.
+
+## Owner dashboard session privacy
+- Sign-out clears loaded lead/staff data and stale lead-list responses are ignored after token changes. Browser-level race-condition testing remains pending.
