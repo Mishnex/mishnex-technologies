@@ -26,7 +26,7 @@ app.use(cors({
     return cb(new Error('Origin not allowed'));
   },
   methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type']
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 const leadLimiter = rateLimit({
@@ -50,6 +50,69 @@ app.post('/api/public/leads', leadLimiter, async (req, res, next) => {
     return res.status(201).json({ received: true, leadId: result.rows[0].id });
   } catch (error) { return next(error); }
 });
+
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-7',
+  legacyHeaders: false, message: { error: 'Too many login attempts. Try again later.' }
+});
+const authConfigured = () => Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY && process.env.OWNER_USER_ID);
+async function supabaseUser(accessToken) {
+  if (!authConfigured()) return null;
+  const response = await fetch(new URL('/auth/v1/user', process.env.SUPABASE_URL), {
+    headers: { apikey: process.env.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + accessToken },
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!response.ok) return null;
+  const user = await response.json();
+  return user?.id === process.env.OWNER_USER_ID ? user : null;
+}
+app.post('/api/admin/login', adminLoginLimiter, async (req, res, next) => {
+  if (!authConfigured()) return res.status(503).json({ error: 'Owner login is not configured yet.' });
+  const { email, password } = req.body || {};
+  if (typeof email !== 'string' || typeof password !== 'string' ||
+      email.length > 254 || password.length > 1024 || !email || !password) {
+    return res.status(400).json({ error: 'Enter a valid email and password.' });
+  }
+  try {
+    const response = await fetch(new URL('/auth/v1/token?grant_type=password', process.env.SUPABASE_URL), {
+      method: 'POST',
+      headers: { apikey: process.env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }), signal: AbortSignal.timeout(8000)
+    });
+    if (!response.ok) return res.status(401).json({ error: 'Invalid credentials or access denied.' });
+    const tokens = await response.json();
+    if (!tokens.access_token || !(await supabaseUser(tokens.access_token))) {
+      return res.status(403).json({ error: 'Owner access only.' });
+    }
+    res.set('Cache-Control', 'no-store');
+    return res.json({ accessToken: tokens.access_token, expiresIn: tokens.expires_in });
+  } catch (error) { next(error); }
+});
+async function requireOwner(req, res, next) {
+  if (!authConfigured()) return res.status(503).json({ error: 'Owner access is not configured yet.' });
+  const match = /^Bearer (\S+)$/.exec(req.get('Authorization') || '');
+  if (!match) return res.status(401).json({ error: 'Authentication required.' });
+  try {
+    const user = await supabaseUser(match[1]);
+    if (!user) return res.status(403).json({ error: 'Access denied.' });
+    req.owner = user;
+    next();
+  } catch (error) { next(error); }
+}
+app.get('/api/admin/me', requireOwner, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ id: req.owner.id, email: req.owner.email, role: 'owner' });
+});
+app.get('/api/admin/leads', requireOwner, async (_req, res, next) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, email, phone, service, budget, preferred_call_time, requirement, created_at FROM public.crm_leads ORDER BY created_at DESC LIMIT 50'
+    );
+    res.set('Cache-Control', 'no-store');
+    res.json({ leads: result.rows });
+  } catch (error) { next(error); }
+});
+
 app.use((error, _req, res, _next) => {
   console.error('API error:', error.message);
   res.status(500).json({ error: 'Unable to submit right now. Please try again.' });
