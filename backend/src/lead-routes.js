@@ -61,6 +61,8 @@ export function leadWorkflowRoutes({ pool, requireOwner }) {
     const parsed = z.string().uuid().safeParse(req.params.leadId);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid lead ID.' });
     try {
+      const exists = await pool.query('SELECT 1 FROM public.crm_leads WHERE id=$1', [parsed.data]);
+      if (!exists.rowCount) return res.status(404).json({ error: 'Lead not found.' });
       const result = await pool.query(
         `SELECT a.id,a.from_status,a.to_status,a.note,a.created_at
          FROM public.crm_lead_activity a
