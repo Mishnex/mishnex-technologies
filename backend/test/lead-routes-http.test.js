@@ -9,13 +9,14 @@ const ownerId='00000000-0000-4000-8000-000000000022';
 async function request({ enabled, owner=true, body={status:'contacted',note:'Called'}, current='new' }) {
   const previous=process.env.LEAD_WORKFLOW_ENABLED;
   const calls=[];
+  const releases=[];
   const client={
     query:async (sql,params)=>{
       calls.push({sql,params});
       if(sql.startsWith('SELECT status')) return {rowCount:1,rows:[{status:current}]};
       return {rowCount:1,rows:[]};
     },
-    release:()=>{}
+    release:broken=>releases.push(broken)
   };
   const app=express();
   app.use(express.json());
@@ -30,7 +31,7 @@ async function request({ enabled, owner=true, body={status:'contacted',note:'Cal
     const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/lead-workflow/'+leadId+'/status',{
       method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify(body)
     });
-    return {status:response.status,json:await response.json(),calls};
+    return {status:response.status,json:await response.json(),calls,releases};
   } finally {
     await new Promise(resolve=>server.close(resolve));
     if(previous===undefined) delete process.env.LEAD_WORKFLOW_ENABLED;
@@ -120,6 +121,7 @@ test('same-status update without note is rejected without activity insert',async
   const result=await request({enabled:true,body:{status:'new'}});
   assert.equal(result.status,400);
   assert.match(result.json.error,/follow-up note is required/i);
+  assert.deepEqual(result.releases,[false],'successful validation rollback returns connection to pool');
   assert.deepEqual(result.calls.map(call=>call.sql.split(' ')[0]),['BEGIN','SELECT','ROLLBACK']);
 });
 
