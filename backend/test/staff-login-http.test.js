@@ -760,3 +760,45 @@ test('Owner employee deactivation rolls back when audit insert fails', async () 
     }
   }
 });
+
+test('Owner employee deactivation skips audit for already inactive account', async () => {
+  const names=['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
+  const saved=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  let server;
+  const statements=[];
+  const staffId='00000000-0000-4000-8000-000000000001';
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key'
+    });
+    const client={
+      query:async sql=>{
+        statements.push(sql);
+        if(sql.includes('returning user_id,role')) return {rowCount:0,rows:[]};
+        return {rowCount:1,rows:[]};
+      },
+      release:()=>{}
+    };
+    const app=express();
+    app.use('/api/admin/staff',staffRoutes({
+      pool:{connect:async()=>client},
+      requireOwner:(req,_res,next)=>{req.owner={id:'00000000-0000-4000-8000-000000000002'};next();}
+    }));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff/'+staffId+'/deactivate',{method:'POST'});
+    assert.equal(response.status,404);
+    assert.deepEqual(statements.slice(0,1),['BEGIN']);
+    assert.match(statements[1],/update public.crm_staff set is_active=false/);
+    assert.equal(statements[2],'ROLLBACK');
+    assert.equal(statements.length,3);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
