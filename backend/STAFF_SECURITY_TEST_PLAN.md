@@ -29,3 +29,9 @@ Run in a controlled staging environment with test accounts. Keep STAFF_MANAGEMEN
 - [ ] Verify login, logout, and password-change API requests against Supabase test users.
 - [ ] Confirm staff credentials and service-role secrets never appear in logs or frontend bundles.
 - [ ] Keep the public website main branch unchanged.
+
+## Local regression run (2026-10-09)
+
+- Session cutoff boundary model: 4 passed, 0 failed using Node's built-in test runner in an isolated local environment.
+- This run tests a copy of the regression cases, not the full backend suite or live Supabase integration. The cutoff policy is still duplicated in the test; refactor to test the production helper directly before production activation.
+- Full backend npm test and real staff authentication remain unverified.
