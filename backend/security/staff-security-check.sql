@@ -30,3 +30,13 @@ select
      ('crm_register_super_admin_session','crm_complete_staff_password_change','crm_revoke_staff_sessions_on_logout','crm_begin_staff_password_change')
      and (has_function_privilege('anon',p.oid,'EXECUTE') or has_function_privilege('authenticated',p.oid,'EXECUTE'))
  ) as staff_function_execute_permissions_ok;
+
+-- RLS enabled on all three sensitive tables; FORCE RLS is reported separately
+-- because privileged service connections may intentionally bypass RLS.
+select c.relname as table_name,
+       c.relrowsecurity as rls_enabled,
+       c.relforcerowsecurity as force_rls_enabled
+from pg_class c join pg_namespace n on n.oid=c.relnamespace
+where n.nspname='public'
+  and c.relname in ('crm_staff','crm_staff_audit','crm_super_admin_sessions')
+order by c.relname;
