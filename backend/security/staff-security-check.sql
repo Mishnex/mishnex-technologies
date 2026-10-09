@@ -40,3 +40,17 @@ from pg_class c join pg_namespace n on n.oid=c.relnamespace
 where n.nspname='public'
   and c.relname in ('crm_staff','crm_staff_audit','crm_super_admin_sessions')
 order by c.relname;
+
+-- Confirm all four sensitive functions actually exist, not just that
+-- existing functions deny direct execution to public API roles.
+select
+  count(distinct p.proname) = 4 as required_functions_present,
+  count(distinct p.proname) as required_functions_found
+from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+where n.nspname='public'
+  and p.proname in (
+    'crm_register_super_admin_session',
+    'crm_complete_staff_password_change',
+    'crm_revoke_staff_sessions_on_logout',
+    'crm_begin_staff_password_change'
+  );
