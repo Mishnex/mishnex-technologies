@@ -54,7 +54,7 @@ loginForm.addEventListener('submit', async event => {
     await loadLeads();
   } catch (error) {
     if (requestId === ownerLoginRequestId) loginMessage.textContent = error.message || 'Sign in failed.';
-  } finally { submit.disabled = false; }
+  } finally { if (requestId === ownerLoginRequestId) submit.disabled = false; }
 });
 async function loadLeads() {
   if (!ownerAccessToken) return;
