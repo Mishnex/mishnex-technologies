@@ -928,3 +928,66 @@ test('Owner employee creation cleans up Auth account if database audit fails', a
     }
   }
 });
+
+test('Owner employee creation returns conflict and cleans Auth on duplicate staff email', async () => {
+  const names=['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
+  const saved=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  const originalFetch=globalThis.fetch;
+  let server;
+  const events=[];
+  const staffId='00000000-0000-4000-8000-000000000001';
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key'
+    });
+    globalThis.fetch=async (_url,options)=>{
+      if(options.method==='DELETE'){
+        events.push('provider-cleanup');
+        return {ok:true,json:async()=>({})};
+      }
+      events.push('provider-create');
+      return {ok:true,json:async()=>({id:staffId})};
+    };
+    const client={
+      query:async sql=>{
+        if(sql==='BEGIN') events.push('database-begin');
+        else if(sql.includes('insert into public.crm_staff(')){
+          events.push('duplicate-staff-email');
+          const error=new Error('duplicate key value violates unique constraint');
+          error.code='23505';
+          throw error;
+        } else if(sql==='ROLLBACK') events.push('database-rollback');
+        else if(sql==='COMMIT') events.push('unexpected-commit');
+        else events.push('unexpected-query');
+        return {rowCount:1,rows:[]};
+      },
+      release:()=>{}
+    };
+    const app=express();
+    app.use(express.json());
+    app.use('/api/admin/staff',staffRoutes({
+      pool:{connect:async()=>client},
+      requireOwner:(req,_res,next)=>{req.owner={id:'00000000-0000-4000-8000-000000000002'};next();}
+    }));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await originalFetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({email:'staff@example.com',fullName:'Test Employee',role:'sales'})
+    });
+    assert.equal(response.status,409);
+    assert.equal((await response.json()).error,'Email already registered.');
+    assert.deepEqual(events,[
+      'provider-create','database-begin','duplicate-staff-email','database-rollback','provider-cleanup'
+    ]);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    globalThis.fetch=originalFetch;
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
