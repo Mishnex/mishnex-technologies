@@ -238,7 +238,7 @@ export function staffRoutes({ pool, requireOwner }) {
         email, password, email_confirm: true, app_metadata: { mishnex_role: role }
       });
       userId = auth.id;
-      if (!userId) throw new Error('Auth account creation did not return a user ID');
+      if (!uuidSchema.safeParse(userId).success) throw new Error('Auth account creation returned an invalid user ID');
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
