@@ -20,3 +20,10 @@ select count(*) as total_events,
        count(*) filter (where action='staff_password_reset') as password_reset_events,
        count(*) filter (where action='staff_deactivated') as deactivation_events
 from public.crm_staff_audit;
+
+-- Session and self-service password security events, aggregate-only.
+select
+  count(*) filter (where action='staff_password_change_started') as password_change_started,
+  count(*) filter (where action='staff_password_changed') as password_change_completed,
+  count(*) filter (where action='staff_logout') as staff_logout_events
+from public.crm_staff_audit;
