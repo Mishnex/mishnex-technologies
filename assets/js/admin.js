@@ -3,12 +3,14 @@ const nav=document.getElementById('adminNav'),overview=document.getElementById('
 nav.addEventListener('click',event=>{const button=event.target.closest('[data-section]');if(!button)return;const key=button.dataset.section,item=modules[key];if(!item)return;nav.querySelectorAll('button').forEach(el=>el.classList.toggle('active',el===button));document.getElementById('pageTitle').textContent=item[0];overview.classList.toggle('active',key==='overview');modulePanel.classList.toggle('active',key!=='overview');if(key!=='overview'){document.getElementById('moduleHeading').textContent=item[0];document.getElementById('moduleDescription').textContent=item[1];document.getElementById('moduleIcon').textContent=item[2]}sidebar.classList.remove('open');toggle.setAttribute('aria-expanded','false');if(typeof staffPanel!=='undefined')staffPanel.hidden=key!=='staff';if(typeof leadPanel!=='undefined')leadPanel.hidden=key!=='leads';const placeholder=document.querySelector('#modulePanel .module-state');if(placeholder)placeholder.hidden=key==='staff'||key==='leads';if(key==='staff')loadStaffPanel();if(key==='leads')loadLeadPanel()});
 toggle.addEventListener('click',()=>{const open=sidebar.classList.toggle('open');toggle.setAttribute('aria-expanded',String(open))});
 let ownerAccessToken = null;
+let ownerLoginRequestId = 0;
 const loginForm = document.getElementById('ownerLoginForm');
 const loginMessage = document.getElementById('loginMessage');
 const loginScreen = document.getElementById('loginScreen');
 const adminApp = document.getElementById('adminApp');
 const apiOrigin = 'https://mishnex-crm-api.onrender.com';
 function signOut() {
+  ownerLoginRequestId++;
   ownerAccessToken = null;
   adminApp.hidden = true;
   loginScreen.hidden = false;
@@ -29,6 +31,7 @@ function signOut() {
 document.getElementById('signOutButton').addEventListener('click', signOut);
 loginForm.addEventListener('submit', async event => {
   event.preventDefault();
+  const requestId = ++ownerLoginRequestId;
   const submit = document.getElementById('loginSubmit');
   submit.disabled = true;
   loginMessage.textContent = 'Checking credentials...';
@@ -41,6 +44,7 @@ loginForm.addEventListener('submit', async event => {
       })
     });
     const result = await response.json();
+    if (requestId !== ownerLoginRequestId) return;
     if (!response.ok || !result.accessToken) throw new Error(result.error || 'Unable to sign in.');
     ownerAccessToken = result.accessToken;
     loginScreen.hidden = true;
@@ -49,7 +53,7 @@ loginForm.addEventListener('submit', async event => {
     loginMessage.textContent = '';
     await loadLeads();
   } catch (error) {
-    loginMessage.textContent = error.message || 'Sign in failed.';
+    if (requestId === ownerLoginRequestId) loginMessage.textContent = error.message || 'Sign in failed.';
   } finally { submit.disabled = false; }
 });
 async function loadLeads() {
