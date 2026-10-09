@@ -6,10 +6,13 @@ on:
       - development/admin-crm-foundation
     paths:
       - 'backend/**'
+      - 'assets/js/admin.js'
       - '.github/workflows/crm-backend-tests.yml'
   pull_request:
     paths:
       - 'backend/**'
+      - 'assets/js/admin.js'
+      - '.github/workflows/crm-backend-tests.yml'
   workflow_dispatch:
 
 permissions:
@@ -28,3 +31,5 @@ jobs:
           node-version: '22'
       - run: npm install --no-audit --no-fund
       - run: npm test
+      - name: Check Owner dashboard JavaScript syntax
+        run: node --check ../assets/js/admin.js
