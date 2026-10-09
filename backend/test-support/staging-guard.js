@@ -9,6 +9,9 @@ export function assertStagingTarget(env) {
   if (auth.protocol !== 'https:' || database.protocol !== 'postgresql:' && database.protocol !== 'postgres:') {
     throw new Error('Expected HTTPS Auth and PostgreSQL connection');
   }
+  if (database.hostname === 'db.wgvqbxgeezrurvnownsd.supabase.co' || database.hostname.includes('wgvqbxgeezrurvnownsd')) {
+    throw new Error('Production database host forbidden');
+  }
   if (database.search || database.hash) {
     throw new Error('Staging database URL must not override TLS settings or contain fragments');
   }
