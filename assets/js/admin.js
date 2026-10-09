@@ -57,6 +57,7 @@ async function loadLeads() {
   const response = await fetch(apiOrigin + '/api/admin/leads', {
     headers: { Authorization: 'Bearer ' + ownerAccessToken }
   });
+  if (requestToken !== ownerAccessToken) return;
   if (response.status === 401 || response.status === 403) { signOut(); return; }
   if (!response.ok) return;
   const result = await response.json();
@@ -123,11 +124,13 @@ async function staffRequest(path, options = {}) {
 }
 async function loadStaffPanel() {
   staffPanel.hidden = false;
+  const requestToken = ownerAccessToken;
   document.querySelector('#modulePanel .module-state').hidden = true;
   staffList.replaceChildren();
   staffStatus.textContent = 'Loading staff...';
   try {
     const result = await staffRequest('/');
+    if(requestToken!==ownerAccessToken)return;
     staffStatus.textContent = '';
     if (!result.staff.length) { staffList.textContent = 'No employees added yet.'; return; }
     result.staff.forEach(member => {
@@ -172,7 +175,7 @@ async function loadStaffPanel() {
       }
       staffList.appendChild(row);
     });
-  } catch (error) { staffStatus.textContent = error.message; }
+  } catch (error) { if(requestToken===ownerAccessToken)staffStatus.textContent = error.message; }
 }
 staffForm.addEventListener('submit', async event => {
   event.preventDefault();
@@ -228,6 +231,7 @@ async function loadLeadPanel(){
     const response=await fetch(apiOrigin+'/api/admin/leads'+query,{
       headers:{Authorization:'Bearer '+ownerAccessToken}
     });
+    if(requestToken!==ownerAccessToken)return;
     if(response.status===401||response.status===403){signOut();return;}
     const data=await response.json();
     if(requestToken!==ownerAccessToken)return;
