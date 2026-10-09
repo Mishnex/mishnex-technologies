@@ -63,6 +63,28 @@ export function staffRoutes({ pool, requireOwner }) {
       });
     } catch (error) { next(error); }
   });
+  // Protected staff identity endpoint: always re-check live DB state before access.
+  router.get('/me', async (req, res, next) => {
+    if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error:'Staff access is disabled.' });
+    const match = /^Bearer (\\S+)$/.exec(req.get('Authorization') || '');
+    if (!match) return res.status(401).json({ error:'Authentication required.' });
+    try {
+      const response = await fetch(new URL('/auth/v1/user', process.env.SUPABASE_URL), {
+        headers:{ apikey:process.env.SUPABASE_ANON_KEY, Authorization:'Bearer ' + match[1] },
+        signal:AbortSignal.timeout(8000)
+      });
+      if (!response.ok) return res.status(401).json({ error:'Invalid session.' });
+      const user = await response.json();
+      const result = await pool.query('select user_id,full_name,role,is_active,must_change_password,sessions_valid_after from public.crm_staff where user_id=$1',[user.id]);
+      if (!result.rowCount || !result.rows[0].is_active) return res.status(403).json({ error:'Account disabled or not found.' });
+      const staff = result.rows[0];
+      if (!tokenIssuedAfterCutoff(match[1],staff.sessions_valid_after)) return res.status(401).json({ error:'Session revoked.' });
+      res.set('Cache-Control','no-store').json({
+        id:staff.user_id,fullName:staff.full_name,role:staff.role,
+        mustChangePassword:staff.must_change_password,crmAccessEnabled:false
+      });
+    } catch (error) { next(error); }
+  });
   // Self-service first-login password change. Does not grant staff CRM access.
   router.post('/change-password', async (req, res, next) => {
     if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error: 'Staff access is not enabled.' });
