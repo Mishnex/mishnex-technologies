@@ -252,7 +252,7 @@ async function loadLeadPanel(){
     if(requestToken!==ownerAccessToken||requestId!==leadListRequestId||leadPanel.hidden)return;
     if(response.status===401||response.status===403){signOut();return;}
     const data=await response.json();
-    if(requestToken!==ownerAccessToken||requestId!==leadListRequestId)return;
+    if(requestToken!==ownerAccessToken||requestId!==leadListRequestId||leadPanel.hidden)return;
     if(!response.ok)throw new Error(data.error||'Unable to load enquiries.');
     const leads=Array.isArray(data.leads)?data.leads:[];
     leadFeedback.textContent=leads.length+' enquiries (up to 50 latest).';
@@ -281,10 +281,10 @@ async function loadLeadPanel(){
           const response=await fetch(apiOrigin+'/api/admin/lead-workflow/'+encodeURIComponent(lead.id)+'/activity',{
             headers:{Authorization:'Bearer '+ownerAccessToken}
           });
-          if(requestToken!==ownerAccessToken)return;
+          if(requestToken!==ownerAccessToken||leadPanel.hidden||!leadResults.contains(item))return;
           if(response.status===401||response.status===403){signOut();return;}
           const data=await response.json().catch(()=>({}));
-          if(requestToken!==ownerAccessToken)return;
+          if(requestToken!==ownerAccessToken||leadPanel.hidden||!leadResults.contains(item))return;
           if(response.status===503){
             history.textContent='Follow-up history is not enabled yet. Existing leads remain available.';
           }else if(!response.ok){
@@ -300,7 +300,7 @@ async function loadLeadPanel(){
               history.appendChild(entry);
             }
           }
-        }catch(error){if(requestToken===ownerAccessToken)history.textContent='Unable to load follow-up history.';}
+        }catch(error){if(requestToken===ownerAccessToken&&!leadPanel.hidden&&leadResults.contains(item))history.textContent='Unable to load follow-up history.';}
         finally{historyButton.disabled=false;}
       });
       const updateForm=document.createElement('form');
