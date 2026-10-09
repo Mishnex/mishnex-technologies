@@ -1,0 +1,32 @@
+name: CRM backend tests
+
+on:
+  push:
+    branches:
+      - development/admin-crm-foundation
+    paths:
+      - 'backend/**'
+      - '.github/workflows/crm-backend-tests.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm test
