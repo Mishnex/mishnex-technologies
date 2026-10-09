@@ -30,6 +30,13 @@ export function staffRoutes({ pool, requireOwner }) {
     }
     return data;
   }
+  function tokenIssuedAfterCutoff(accessToken, cutoff) {
+    try {
+      const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64url').toString('utf8'));
+      // JWT iat is second-resolution; allow a one-second boundary for cutoff timestamps.
+      return Number.isInteger(payload.iat) && payload.iat + 1 >= Math.floor(new Date(cutoff).getTime() / 1000);
+    } catch { return false; }
+  }
   // Temporary-password login is restricted to password setup; it never grants CRM module access.
   router.post('/login', async (req, res, next) => {
     if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error:'Staff login is disabled.' });
@@ -48,6 +55,7 @@ export function staffRoutes({ pool, requireOwner }) {
       );
       if (!staff.rowCount || !staff.rows[0].is_active) return res.status(403).json({ error:'Staff access denied.' });
       const account = staff.rows[0];
+      if (!tokenIssuedAfterCutoff(data.access_token, account.sessions_valid_after)) return res.status(401).json({ error:'Session revoked. Sign in again.' });
       res.set('Cache-Control','no-store').json({
         accessToken:data.access_token, expiresIn:data.expires_in,
         role:account.role, mustChangePassword:account.must_change_password,
@@ -71,8 +79,7 @@ export function staffRoutes({ pool, requireOwner }) {
       const user = await response.json();
       const staff = await pool.query('select is_active,sessions_valid_after from public.crm_staff where user_id=$1', [user.id]);
       if (!staff.rowCount || !staff.rows[0].is_active) return res.status(403).json({ error: 'Active staff account required.' });
-      const tokenBody = JSON.parse(Buffer.from(match[1].split('.')[1], 'base64url').toString('utf8'));
-      if (!Number.isFinite(tokenBody.iat) || tokenBody.iat * 1000 < new Date(staff.rows[0].sessions_valid_after).getTime()) return res.status(401).json({ error:'Session revoked. Sign in again.' });
+      if (!tokenIssuedAfterCutoff(match[1], staff.rows[0].sessions_valid_after)) return res.status(401).json({ error:'Session revoked. Sign in again.' });
       await adminApi('users/' + encodeURIComponent(user.id), 'PUT', { password: parsed.data });
       await pool.query('update public.crm_staff set must_change_password=false, sessions_valid_after=now(), updated_at=now() where user_id=$1', [user.id]);
       res.set('Cache-Control', 'no-store').json({ changed: true, message: 'Password updated. Sign in again.' });
