@@ -56,6 +56,7 @@ export function staffRoutes({ pool, requireOwner }) {
   }
   // Authenticated identity must be checked against the live staff record on every request.
   async function requireStaffPermission(permission, req, res, next) {
+    if (process.env.STAFF_CRM_ENABLED !== 'true') return res.status(503).json({ error:'Staff CRM modules are disabled.' });
     if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error:'Staff CRM access disabled.' });
     const match = /^Bearer (\S+)$/.exec(req.get('Authorization') || '');
     if (!match) return res.status(401).json({ error:'Authentication required.' });
