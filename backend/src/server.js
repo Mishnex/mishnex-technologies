@@ -56,6 +56,13 @@ app.post('/api/public/leads', leadLimiter, async (req, res, next) => {
 
 
 // Password recovery is hosted on the API domain so it works before the public site deploy.
+app.get('/staff-login', async (_req, res, next) => {
+  try {
+    const page = await readFile(fileURLToPath(new URL('../public/staff-login.html', import.meta.url)), 'utf8');
+    res.set('Cache-Control', 'no-store');
+    res.type('html').send(page);
+  } catch (error) { next(error); }
+});
 app.get('/forgot-password', async (_req, res, next) => {
   try {
     const page = await readFile(fileURLToPath(new URL('../public/forgot-password.html', import.meta.url)), 'utf8');
