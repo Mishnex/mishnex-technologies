@@ -1186,3 +1186,33 @@ test('Employee creation is denied to unauthenticated users before any side effec
     }
   }
 });
+
+test('Employee deactivation denies non-Owner requests without opening a transaction', async () => {
+  const names=['STAFF_MANAGEMENT_ENABLED','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
+  const saved=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  let server;
+  let databaseCalls=0;
+  try {
+    Object.assign(process.env,{
+      STAFF_MANAGEMENT_ENABLED:'true',
+      SUPABASE_URL:'https://isolated-staff-test.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY:'fake-test-only-service-key'
+    });
+    const app=express();
+    app.use('/api/admin/staff',staffRoutes({
+      pool:{connect:async()=>{databaseCalls++;throw new Error('Unexpected database access');}},
+      requireOwner:(_req,res)=>res.status(403).json({error:'Owner access required.'})
+    }));
+    server=app.listen(0,'127.0.0.1');
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/staff/00000000-0000-4000-8000-000000000001/deactivate',{method:'POST'});
+    assert.equal(response.status,403);
+    assert.equal(databaseCalls,0);
+  } finally {
+    if(server) await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));
+    for(const name of names){
+      if(saved[name]===undefined) delete process.env[name];
+      else process.env[name]=saved[name];
+    }
+  }
+});
