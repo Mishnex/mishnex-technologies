@@ -127,6 +127,7 @@ test('lead COMMIT acknowledgement failure returns uncertain outcome instead of c
   const previous=process.env.LEAD_WORKFLOW_ENABLED;
   process.env.LEAD_WORKFLOW_ENABLED='true';
   const calls=[];
+  const releases=[];
   const client={
     query:async sql=>{
       calls.push(sql);
@@ -134,7 +135,7 @@ test('lead COMMIT acknowledgement failure returns uncertain outcome instead of c
       if(sql==='COMMIT')throw new Error('commit acknowledgement lost');
       return {rowCount:1,rows:[]};
     },
-    release:()=>{}
+    release:broken=>releases.push(broken)
   };
   const app=express();
   app.use(express.json());
@@ -151,6 +152,7 @@ test('lead COMMIT acknowledgement failure returns uncertain outcome instead of c
     assert.equal(response.status,503);
     assert.match((await response.json()).error,/outcome is uncertain/i);
     assert.equal(calls.filter(sql=>sql==='COMMIT').length,1);
+    assert.deepEqual(releases,[true],'uncertain COMMIT must discard the connection');
   }finally{
     await new Promise(resolve=>server.close(resolve));
     if(previous===undefined)delete process.env.LEAD_WORKFLOW_ENABLED;
