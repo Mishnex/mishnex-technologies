@@ -312,11 +312,18 @@ export function staffRoutes({ pool, requireOwner }) {
       // Revoke existing CRM sessions before changing the external Auth password.
       await pool.query('select public.crm_begin_staff_password_change($1)', [id]);
       const password = secret();
-      await adminApi('users/' + encodeURIComponent(id), 'PUT', { password });
-      await pool.query(
-        "insert into public.crm_staff_audit(actor_id,target_id,action,detail) values ($1,$2,'staff_password_reset',$3)",
-        [req.owner.id,id,JSON.stringify({ method:'owner_manual' })]
-      );
+      try {
+        await adminApi('users/' + encodeURIComponent(id), 'PUT', { password });
+        await pool.query(
+          "insert into public.crm_staff_audit(actor_id,target_id,action,detail) values ($1,$2,'staff_password_reset',$3)",
+          [req.owner.id,id,JSON.stringify({ method:'owner_manual' })]
+        );
+      } catch (error) {
+        console.error('Owner staff password reset requires recovery', { userId:id, message:error.message });
+        return res.status(503).set('Cache-Control','no-store').json({
+          error:'Employee password reset could not be confirmed. Existing sessions were revoked. Retry the reset or contact support.'
+        });
+      }
       res.set('Cache-Control','no-store').json({ temporaryPassword:password, warning:'Copy securely. Old CRM sessions are not accepted by future session-cutoff-aware authorization middleware.' });
     } catch (error) { next(error); }
   });
