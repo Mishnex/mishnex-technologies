@@ -285,7 +285,6 @@ async function loadLeadPanel(){
           if(response.status===401||response.status===403){signOut();return;}
           const data=await response.json().catch(()=>({}));
           if(requestToken!==ownerAccessToken)return;
-          if(requestToken!==ownerAccessToken)return;
           if(response.status===503){
             history.textContent='Follow-up history is not enabled yet. Existing leads remain available.';
           }else if(!response.ok){
@@ -362,10 +361,12 @@ async function loadLeadPanel(){
             headers:{Authorization:'Bearer '+ownerAccessToken,'Content-Type':'application/json'},
             body:JSON.stringify(payload)
           });
+          if(requestToken!==ownerAccessToken)return;
           if(response.status===401||response.status===403){signOut();return;}
           const data=await response.json().catch(()=>({}));
+          if(requestToken!==ownerAccessToken)return;
           if(response.status===503){
-            updateFeedback.textContent='Lead updates are not enabled yet. No changes saved.';
+            updateFeedback.textContent=data.error||'Lead updates are not enabled yet.';
           }else if(!response.ok){
             updateFeedback.textContent=data.error||'Unable to save follow-up.';
           }else{
