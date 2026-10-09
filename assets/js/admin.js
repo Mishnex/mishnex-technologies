@@ -84,7 +84,7 @@ const staffInfo = document.createElement('p');
 staffInfo.textContent = 'Create staff without invitation emails. Copy the temporary password securely and ask the employee to change it before staff access is enabled.';
 staffPanel.appendChild(staffInfo);
 const staffForm = document.createElement('form');
-staffForm.innerHTML = '<label>Full name <input name="fullName" minlength="2" maxlength="120" required></label> <label>Email <input name="email" type="email" maxlength="254" required></label> <label>Role <select name="role"><option value="sales">Sales</option><option value="developer">Developer</option><option value="manager">Manager</option><option value="accountant">Accountant</option><option value="super_admin">Super Admin</option></select></label> <button type="submit">Create employee</button>';
+staffForm.innerHTML = '<label>Full name <input name="fullName" minlength="2" maxlength="120" required></label> <label>Email address (Gmail / Yahoo / Outlook) <input name="email" type="email" maxlength="254" required></label> <label>Role <select name="role"><option value="sales">Sales</option><option value="developer">Developer</option><option value="manager">Manager</option><option value="accountant">Accountant</option><option value="super_admin">Super Admin</option></select></label> <button type="submit">Create employee</button>';
 staffPanel.appendChild(staffForm);
 const staffStatus = document.createElement('p');
 staffStatus.setAttribute('role','status');
