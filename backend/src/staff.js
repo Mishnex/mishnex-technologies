@@ -75,7 +75,7 @@ export function staffRoutes({ pool, requireOwner }) {
   // Protected staff identity endpoint: always re-check live DB state before access.
   router.get('/me', async (req, res, next) => {
     if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error:'Staff access is disabled.' });
-    const match = /^Bearer (\\S+)$/.exec(req.get('Authorization') || '');
+    const match = /^Bearer (\S+)$/.exec(req.get('Authorization') || '');
     if (!match) return res.status(401).json({ error:'Authentication required.' });
     try {
       const response = await fetch(new URL('/auth/v1/user', process.env.SUPABASE_URL), {
@@ -97,7 +97,7 @@ export function staffRoutes({ pool, requireOwner }) {
   // Self-service first-login password change. Does not grant staff CRM access.
   router.post('/change-password', passwordChangeLimiter, async (req, res, next) => {
     if (!configured() || !process.env.SUPABASE_ANON_KEY) return res.status(503).json({ error: 'Staff access is not enabled.' });
-    const match = /^Bearer (\\S+)$/.exec(req.get('Authorization') || '');
+    const match = /^Bearer (\S+)$/.exec(req.get('Authorization') || '');
     if (!match) return res.status(401).json({ error: 'Sign in first.' });
     const parsed = z.object({ newPassword: z.string().min(12).max(128) }).strict().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'New password must contain 12 to 128 characters.' });
