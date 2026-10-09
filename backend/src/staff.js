@@ -208,9 +208,7 @@ export function staffRoutes({ pool, requireOwner }) {
       if (!staff.rowCount || !staff.rows[0].is_active) return res.status(403).json({ error: 'Active staff account required.' });
       if (!tokenIssuedAfterCutoff(match[1], staff.rows[0].sessions_valid_after)) return res.status(401).json({ error:'Session revoked. Sign in again.' });
       await adminApi('users/' + encodeURIComponent(user.id), 'PUT', { password: parsed.data });
-      await pool.query('update public.crm_staff set must_change_password=false, sessions_valid_after=now(), updated_at=now() where user_id=$1', [user.id]);
-      await pool.query('update public.crm_super_admin_sessions set revoked_at=now() where user_id=$1 and revoked_at is null', [user.id]);
-      await pool.query("insert into public.crm_staff_audit(actor_id,target_id,action,detail) values ($1,$1,'staff_password_changed',$2::jsonb)", [user.id,JSON.stringify({ method:'self_service' })]);
+      await pool.query('select public.crm_complete_staff_password_change($1)', [user.id]);
       res.set('Cache-Control', 'no-store').json({ changed: true, message: 'Password updated. Sign in again.' });
     } catch (error) { next(error); }
   });
