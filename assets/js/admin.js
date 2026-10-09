@@ -176,11 +176,11 @@ async function loadStaffPanel() {
           credentialValue.textContent = '';
           try {
             await staffRequest('/' + encodeURIComponent(member.user_id) + '/deactivate', { method:'POST' });
-            if (requestToken !== ownerAccessToken) return;
+            if (requestToken !== ownerAccessToken || staffPanel.hidden) return;
             await loadStaffPanel();
-            if (requestToken !== ownerAccessToken) return;
+            if (requestToken !== ownerAccessToken || staffPanel.hidden) return;
             staffStatus.textContent = 'Employee deactivated.';
-          } catch (error) { if (requestToken === ownerAccessToken) staffStatus.textContent = error.message; }
+          } catch (error) { if (requestToken === ownerAccessToken && !staffPanel.hidden) staffStatus.textContent = error.message; }
           finally { deactivate.disabled = false; }
         });
         row.appendChild(deactivate);
@@ -249,7 +249,7 @@ async function loadLeadPanel(){
     const response=await fetch(apiOrigin+'/api/admin/leads'+query,{
       headers:{Authorization:'Bearer '+ownerAccessToken}
     });
-    if(requestToken!==ownerAccessToken||requestId!==leadListRequestId)return;
+    if(requestToken!==ownerAccessToken||requestId!==leadListRequestId||leadPanel.hidden)return;
     if(response.status===401||response.status===403){signOut();return;}
     const data=await response.json();
     if(requestToken!==ownerAccessToken||requestId!==leadListRequestId)return;
@@ -383,5 +383,5 @@ async function loadLeadPanel(){
       item.append(historyButton,history,updateForm);
       leadResults.appendChild(item);
     }
-  }catch(error){if(requestToken===ownerAccessToken&&requestId===leadListRequestId)leadFeedback.textContent=error.message||'Unable to load enquiries.';}
+  }catch(error){if(requestToken===ownerAccessToken&&requestId===leadListRequestId&&!leadPanel.hidden)leadFeedback.textContent=error.message||'Unable to load enquiries.';}
 }
