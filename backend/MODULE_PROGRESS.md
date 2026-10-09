@@ -59,3 +59,5 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 - Additional dashboard session guard: stale 401/403 lead responses cannot sign out a newer Owner session, and stale staff-list results cannot repopulate the UI. Browser race tests still pending.
 
 - Lead follow-up history and status-save UI now ignore stale responses from an earlier Owner session; browser race tests remain pending.
+
+- Fixed Owner dashboard navigation wiring: CRM Leads menu now invokes lead loading and hides unrelated module panels. Browser smoke test remains pending.
