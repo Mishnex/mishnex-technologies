@@ -309,10 +309,10 @@ export function staffRoutes({ pool, requireOwner }) {
     try {
       const result = await pool.query('select user_id from public.crm_staff where user_id=$1 and is_active=true',[id]);
       if (!result.rowCount) return res.status(404).json({ error:'Active staff member not found.' });
+      // Revoke existing CRM sessions before changing the external Auth password.
+      await pool.query('select public.crm_begin_staff_password_change($1)', [id]);
       const password = secret();
       await adminApi('users/' + encodeURIComponent(id), 'PUT', { password });
-      await pool.query('update public.crm_staff set must_change_password=true,sessions_valid_after=now(),updated_at=now() where user_id=$1',[id]);
-      await pool.query('update public.crm_super_admin_sessions set revoked_at=now() where user_id=$1 and revoked_at is null',[id]);
       await pool.query(
         "insert into public.crm_staff_audit(actor_id,target_id,action,detail) values ($1,$2,'staff_password_reset',$3)",
         [req.owner.id,id,JSON.stringify({ method:'owner_manual' })]
