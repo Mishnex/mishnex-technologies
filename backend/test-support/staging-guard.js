@@ -9,6 +9,9 @@ export function assertStagingTarget(env) {
   if (auth.protocol !== 'https:' || database.protocol !== 'postgresql:' && database.protocol !== 'postgres:') {
     throw new Error('Expected HTTPS Auth and PostgreSQL connection');
   }
+  if (database.search || database.hash) {
+    throw new Error('Staging database URL must not override TLS settings or contain fragments');
+  }
   if (auth.hostname === 'wgvqbxgeezrurvnownsd.supabase.co') throw new Error('Production Supabase project forbidden');
   if (env.STAGING_SUPABASE_PROJECT_ID && auth.hostname !== env.STAGING_SUPABASE_PROJECT_ID + '.supabase.co') {
     throw new Error('Staging Supabase project mismatch');
