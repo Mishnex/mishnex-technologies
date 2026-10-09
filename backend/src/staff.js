@@ -244,8 +244,8 @@ export function staffRoutes({ pool, requireOwner }) {
       let transactionOpen = false;
       let connectionBroken = false;
       try {
-        await client.query('BEGIN');
         transactionOpen = true;
+        await client.query('BEGIN');
         await client.query(
           'insert into public.crm_staff(user_id,email,full_name,role,created_by) values ($1,$2,$3,$4,$5)',
           [userId,email,fullName,role,req.owner.id]
