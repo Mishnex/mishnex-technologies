@@ -261,10 +261,17 @@ export function staffRoutes({ pool, requireOwner }) {
         warning:'Copy this password securely now. It will not be shown again.'
       });
     } catch (error) {
+      let cleanupFailed = false;
       if (userId) {
         try { await adminApi('users/' + encodeURIComponent(userId), 'DELETE'); }
-        catch (cleanupError) { console.error('Orphan staff auth account cleanup failed:', cleanupError.message); }
+        catch (cleanupError) {
+          cleanupFailed = true;
+          console.error('Orphan staff auth account cleanup failed:', cleanupError.message);
+        }
       }
+      if (cleanupFailed) return res.status(503).json({
+        error:'Employee provisioning failed and Auth cleanup could not be confirmed. Do not retry until the account is reconciled by an authorized operator.'
+      });
       if (error.code === '23505') return res.status(409).json({ error:'Email already registered.' });
       if (error.message?.includes('Maximum 5 active Super Admin')) return res.status(409).json({ error:'Maximum 5 active Super Admin accounts allowed.' });
       if (error.status === 422) return res.status(409).json({ error:'Staff email already exists or is invalid.' });
