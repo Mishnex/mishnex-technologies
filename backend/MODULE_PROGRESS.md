@@ -67,3 +67,5 @@ Percentages discussed previously are planning estimates, **not** evidence of com
 - Owner employee creation, password reset and deactivation UI now ignore delayed responses from an expired/signed-out Owner session; browser race regression test remains pending.
 
 - Owner login now invalidates in-flight login responses on sign-out, preventing a delayed response from restoring a session; browser-level race test remains pending.
+
+- Owner lead status updates now ignore delayed responses after sign-out and display the API's uncertain-COMMIT warning instead of falsely claiming no changes were saved. Browser regression test pending.
