@@ -64,3 +64,7 @@ Apply `backend/sql/005_multiple_upi_options.sql` before deploying this version. 
 ## Shared company theme
 
 All hosted Owner/staff sign-in, admin workspace, client portal, recovery and quotation/payment pages use the website's final orange/cream palette and original `assets/img/logo-transparent.png`. A shared `/branding/brand.css` stylesheet keeps buttons, forms, cards and navigation consistent. Only the exact logo and stylesheet are publicly served; repository directories are not exposed. Quotation Print / Save PDF retains the logo, company footer and readable print colors, with payment controls excluded from print. Hosted-page script/CSP checks and quotation DOM smoke checks pass. These visual changes are saved on the feature branch and are not yet deployed live.
+
+## Customer payment acknowledgement
+
+After a reference submission, both quotation and client portal show a dedicated acknowledgement with reported amount, transaction reference, total, verified paid amount, remaining balance and clearly labelled expected balance after approval. Pending submissions do not reduce the verified balance. Refreshing status changes the box to Payment confirmed only after backend approval; rejected references show the review reason. Portal sign-out/account switching clears the acknowledgement. Hosted script/CSP and DOM pending-to-approved balance checks pass. This code is saved on the feature branch; live deployment is outstanding.
