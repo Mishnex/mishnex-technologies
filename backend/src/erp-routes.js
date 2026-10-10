@@ -44,7 +44,10 @@ export function erpRoutes({pool,requireOwner}) {
   const schema=z.object(Object.fromEntries(Object.entries(s.fields).map(([key,[,type]])=>[key,type.optional()]))).strict();
   const parsed=schema.safeParse(req.body);
   if(!parsed.success||!Object.keys(parsed.data).length)return res.status(400).json({error:'Invalid or empty details.'});
+  const required={projects:['name'],tasks:['projectId','title'],quotations:['title','amount'],invoices:['clientId','amount'],website:['pageKey','sectionKey','content']};
+  if(required[req.params.resource].some(key=>parsed.data[key]===undefined))return res.status(400).json({error:'Missing required fields.'});
   const entries=Object.entries(parsed.data).filter(([,v])=>v!==undefined);
+  if(req.params.resource==='invoices'&&('paidAmount' in parsed.data||parsed.data.status==='paid'||parsed.data.status==='part_paid'))return res.status(400).json({error:'Use a verified payment workflow to record payments.'});
   if(req.params.resource==='invoices'&&parsed.data.paidAmount!==undefined&&parsed.data.amount!==undefined&&parsed.data.paidAmount>parsed.data.amount)return res.status(400).json({error:'Paid amount exceeds invoice amount.'});
   const columns=entries.map(([key])=>s.fields[key][0]),params=entries.map(([,v])=>v);
   try{const r=await pool.query('insert into public.'+s.table+' ('+columns.join(',')+') values ('+params.map((_,i)=>'$'+(i+1)).join(',')+') returning *',params);res.status(201).json({item:r.rows[0]})}
@@ -55,6 +58,7 @@ export function erpRoutes({pool,requireOwner}) {
   const parsed=schema.safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'Invalid details.'});
   const entries=Object.entries(parsed.data).filter(([,v])=>v!==undefined);
   if(!entries.length)return res.status(400).json({error:'No changes.'});
+  if(req.params.resource==='invoices'&&('paidAmount' in parsed.data||parsed.data.status==='paid'||parsed.data.status==='part_paid'))return res.status(400).json({error:'Payment amounts and paid status require a verified payment workflow.'});
   const columns=entries.map(([key])=>s.fields[key][0]),params=entries.map(([,v])=>v);
   try{const r=await pool.query('update public.'+s.table+' set '+columns.map((col,i)=>col+'=$'+(i+2)).join(',')+' where id=$1 returning *',[id.data,...params]);if(!r.rowCount)return res.status(404).json({error:'Record not found.'});res.json({item:r.rows[0]})}
   catch(e){if(['23503','23514','23502','23505','22P02'].includes(e.code))return res.status(400).json({error:'Invalid linked record or field values.'});next(e)}
