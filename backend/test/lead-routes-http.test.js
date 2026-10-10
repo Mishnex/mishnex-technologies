@@ -102,7 +102,7 @@ test('lead activity history returns 404 for unknown lead without reading activit
     assert.equal(response.status,404);
     assert.equal((await response.json()).error,'Lead not found.');
     assert.equal(queries.length,1);
-    assert.match(queries[0],/SELECT 1 FROM public.crm_leads/);
+    assert.match(queries[0],/FROM public.crm_leads l/);
   } finally {
     await new Promise(resolve=>server.close(resolve));
     if(previous===undefined) delete process.env.LEAD_WORKFLOW_ENABLED;
@@ -185,7 +185,6 @@ test('lead activity history returns ordered records only for the requested lead'
   app.use('/api/admin/lead-workflow',leadWorkflowRoutes({
     pool:{query:async(sql,params)=>{
       queries.push({sql,params});
-      if(sql.startsWith('SELECT 1 FROM public.crm_leads'))return {rowCount:1,rows:[{one:1}]};
       return {rowCount:1,rows:expected};
     }},
     requireOwner:(req,_res,next)=>{req.owner={id:ownerId};next();}
@@ -197,9 +196,10 @@ test('lead activity history returns ordered records only for the requested lead'
     assert.equal(response.status,200);
     assert.equal(response.headers.get('cache-control'),'no-store');
     assert.deepEqual(await response.json(),{leadId,activity:expected});
-    assert.equal(queries.length,2);
-    assert.deepEqual(queries.map(query=>query.params),[[leadId],[leadId]]);
-    assert.match(queries[1].sql,/ORDER BY a.created_at DESC,a.id DESC LIMIT 100/);
+    assert.equal(queries.length,1);
+    assert.deepEqual(queries.map(query=>query.params),[[leadId]]);
+    assert.match(queries[0].sql,/LEFT JOIN LATERAL/);
+    assert.match(queries[0].sql,/ORDER BY created_at DESC,id DESC/);
   }finally{
     await new Promise(resolve=>server.close(resolve));
     if(previous===undefined)delete process.env.LEAD_WORKFLOW_ENABLED;
@@ -329,6 +329,33 @@ test('missing lead returns 404 and closes transaction without writing activity',
     assert.deepEqual(calls.map(sql=>sql.split(' ')[0]),['BEGIN','SELECT','ROLLBACK']);
     assert.deepEqual(releases,[false]);
   }finally{
+    await new Promise(resolve=>server.close(resolve));
+    if(previous===undefined)delete process.env.LEAD_WORKFLOW_ENABLED;
+    else process.env.LEAD_WORKFLOW_ENABLED=previous;
+  }
+});
+
+test('existing lead with no activity returns empty history from one query',async()=>{
+  const previous=process.env.LEAD_WORKFLOW_ENABLED;
+  process.env.LEAD_WORKFLOW_ENABLED='true';
+  const queries=[];
+  const app=express();
+  app.use('/api/admin/lead-workflow',leadWorkflowRoutes({
+    pool:{query:async(sql,params)=>{
+      queries.push({sql,params});
+      return {rowCount:1,rows:[{id:null,from_status:null,to_status:null,note:null,created_at:null}]};
+    }},
+    requireOwner:(req,_res,next)=>{req.owner={id:ownerId};next();}
+  }));
+  const server=app.listen(0,'127.0.0.1');
+  try {
+    await new Promise(resolve=>server.once('listening',resolve));
+    const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/lead-workflow/'+leadId+'/activity');
+    assert.equal(response.status,200);
+    assert.deepEqual(await response.json(),{leadId,activity:[]});
+    assert.equal(queries.length,1);
+    assert.deepEqual(queries[0].params,[leadId]);
+  } finally {
     await new Promise(resolve=>server.close(resolve));
     if(previous===undefined)delete process.env.LEAD_WORKFLOW_ENABLED;
     else process.env.LEAD_WORKFLOW_ENABLED=previous;
