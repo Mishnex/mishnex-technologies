@@ -88,7 +88,7 @@ export function staffRoutes({ pool, requireOwner }) {
   router.get('/leads', (req,res,next) => requireStaffPermission('leads:read',req,res,next), async (_req,res,next) => {
     try {
       const result = await pool.query(
-        'select id,name,email,service,created_at from public.crm_leads order by created_at desc limit 50'
+        'select id,name,email,phone,service,status,created_at from public.crm_leads order by created_at desc limit 50'
       );
       res.set('Cache-Control','no-store').json({ leads:result.rows });
     } catch(error) { next(error); }

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import {transaction,reject} from './transaction.js';
+import {workMutation,recordWork} from './work-activity.js';
 
 // Staging ERP owner API. Explicit resource allowlist prevents arbitrary SQL/table access.
 export function erpRoutes({pool,requireOwner,authorize}) {
@@ -89,7 +90,7 @@ export function erpRoutes({pool,requireOwner,authorize}) {
     const quote=await pool.query('select client_id,currency,amount,status from public.crm_quotations where id=$1',[parsed.data.quotationId]);
     const q=quote.rows[0];if(!q||q.client_id!==parsed.data.clientId||q.currency.trim()!==(parsed.data.currency||'INR')||Number(q.amount)!==parsed.data.amount||q.status!=='accepted')return res.status(400).json({error:'Invoice must match an accepted quotation for the same client, amount and currency.'});
    }
-   const r=await pool.query('insert into public.'+s.table+' ('+columns.join(',')+') values ('+params.map((_,i)=>'$'+(i+1)).join(',')+') returning *',params);res.status(201).json({item:r.rows[0]})}
+   const r=await workMutation(pool,req.actor,req.params.resource,'insert into public.'+s.table+' ('+columns.join(',')+') values ('+params.map((_,i)=>'$'+(i+1)).join(',')+') returning *',params,'created');res.status(201).json({item:r.rows[0]})}
   catch(e){if(e.status)return res.status(e.status).json({error:e.message});if(['23503','23514','23502','23505','22P02'].includes(e.code))return res.status(400).json({error:'Invalid linked record or field values.'});next(e)}
  });
  router.patch('/:resource/:id',async(req,res,next)=>{const s=specFor(req,res),id=positiveId.safeParse(req.params.id);if(!s)return;if(!id.success)return res.status(400).json({error:'Invalid record ID.'});if(req.params.resource==='website')return res.status(405).json({error:'Website content updates require a page and section key.'});
@@ -115,14 +116,14 @@ export function erpRoutes({pool,requireOwner,authorize}) {
       if(!allowed.includes(parsed.data.status))reject(409,'Invoice status change is not allowed. Paid status is managed by payment review.');
      }
      if(parsed.data.quotationId)reject(409,'Linked quotation cannot be changed. Create a corrected draft invoice.');
-     const result=await client.query('update public.crm_invoices set '+columns.map((col,i)=>col+'=$'+(i+2)).join(',')+' where id=$1 returning *',[id.data,...params]);return result.rows[0];
+     const result=await client.query('update public.crm_invoices set '+columns.map((col,i)=>col+'=$'+(i+2)).join(',')+' where id=$1 returning *',[id.data,...params]);await recordWork(client,req.actor,'invoices',result.rows[0],'updated');return result.rows[0];
     });return res.json({item});
    }
    if(req.actor.role==='developer'){
     if(Object.keys(parsed.data).some(k=>k!=='status'))return res.status(403).json({error:'Developers may update only their assigned task status.'});
-    const r=await pool.query('update public.crm_project_tasks set status=$2 where id=$1 and assignee=$3 returning *',[id.data,parsed.data.status,req.actor.id]);if(!r.rowCount)return res.status(404).json({error:'Assigned task not found.'});return res.json({item:r.rows[0]});
+    const r=await workMutation(pool,req.actor,'tasks','update public.crm_project_tasks set status=$2 where id=$1 and assignee=$3 returning *',[id.data,parsed.data.status,req.actor.id],'updated');if(!r.rowCount)return res.status(404).json({error:'Assigned task not found.'});return res.json({item:r.rows[0]});
    }
-   const r=await pool.query('update public.'+s.table+' set '+columns.map((col,i)=>col+'=$'+(i+2)).join(',')+' where id=$1 returning *',[id.data,...params]);if(!r.rowCount)return res.status(404).json({error:'Record not found.'});res.json({item:r.rows[0]})}
+   const r=await workMutation(pool,req.actor,req.params.resource,'update public.'+s.table+' set '+columns.map((col,i)=>col+'=$'+(i+2)).join(',')+' where id=$1 returning *',[id.data,...params],'updated');if(!r.rowCount)return res.status(404).json({error:'Record not found.'});res.json({item:r.rows[0]})}
   catch(e){if(e.status)return res.status(e.status).json({error:e.message});if(['23503','23514','23502','23505','22P02'].includes(e.code))return res.status(400).json({error:'Invalid linked record or field values.'});next(e)}
  });
  return router;

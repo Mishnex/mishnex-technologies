@@ -16,6 +16,7 @@ import {quotationRoutes} from './quotation-routes.js';
 import {upiRoutes} from './upi-routes.js';
 import {quoteLinkRoutes} from './quote-link-routes.js';
 import {paymentControlRoutes} from './payment-control-routes.js';
+import {employeeActivityRoutes} from './employee-activity-routes.js';
 import { policyRoutes } from './policy-routes.js';
 import { workspaceAuth } from './workspace-auth.js';
 import { paymentRoutes } from './payment-routes.js';
@@ -215,6 +216,7 @@ app.use('/api/admin/quotations',quotationRoutes({pool,authorize:workspaceAuth(po
 app.use('/api/public',upiRoutes({pool}));
 app.use('/api/quote-link',quoteLinkRoutes({pool}));
 app.get('/quotation',async(_req,res,next)=>{try{const page=await readFile(fileURLToPath(new URL('../public/quotation.html',import.meta.url)),'utf8');res.set('Content-Security-Policy',pageSecurity(page));res.set('Referrer-Policy','no-referrer');res.set('Cache-Control','no-store');res.set('X-Robots-Tag','noindex,nofollow');res.type('html').send(page)}catch(e){next(e)}});
+app.use('/api/admin/employee-activity',employeeActivityRoutes({pool,authorize:workspaceAuth(pool)}));
 app.use('/api/admin/payment-controls',paymentControlRoutes({pool,authorize:workspaceAuth(pool)}));
 app.use('/api/admin/settings',policyRoutes({pool,requireOwner}));
 app.use('/api/admin/payments', paymentRoutes({pool,authorize:workspaceAuth(pool),requireOwner}));

@@ -10,6 +10,12 @@ Staging now includes SQL 010: stored unique client codes CL-000001, employee cod
 
 Owner secure browser sign-in succeeded after corrected credentials; quotation and advance-control pages were inspected. The employee/client interface improvements are live; real employee/client end-to-end acceptance and actual bank transfers remain unverified.
 
+## Employee activity tracking
+
+Owner-only Employee activity reports accept a date range (India time, up to 366 days) and employee filter, including inactive employees. Summary includes reported call attempts, connected calls, call minutes, follow-up notes, quotations created/currently ready or accepted, lead updates, task updates/completions, projects and invoices created. Latest 200 detail events are shown; summary counts cover the full range. Employees with lead-read access can log calls/follow-ups against their own authenticated identity and see their own latest 100 logs. Request keys prevent retry double-counting; logs have server timestamps and no edit/delete endpoints. Dial links do not automatically count as completed phone calls.
+
+Task/project/invoice mutations and work logs save in one transaction. Unchanged done-task saves do not inflate completions. Existing quotation creation and lead histories supply older records; other work tracking starts with this deployment. Tracking is for recorded CRM activity, not automatic phone/device monitoring or all historical employee work. Staging SQL 011 is applied with RLS and no direct public grants. 212 automated tests pass, plus Owner report DOM checks and real staging rollback assertion for India midnight boundaries. Production unchanged.
+
 ## Implemented
 
 - Individual staff credentials, Owner-only provisioning/deactivation, first-login password change and live role/session checks. Database caps retain five active Super Admin accounts and five active Super Admin sessions. Enabled staff sign-in leads to the shared role-specific workspace.
