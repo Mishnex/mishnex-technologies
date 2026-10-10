@@ -17,6 +17,25 @@ export function erpRoutes({pool,requireOwner}) {
   website:{table:'crm_website_content',fields:{pageKey:['page_key',z.string().regex(/^[a-z0-9_-]{1,80}$/)],sectionKey:['section_key',z.string().regex(/^[a-z0-9_-]{1,80}$/)],content:['content',z.record(z.unknown()).refine(x=>JSON.stringify(x).length<=8000)]}}
  };
  function specFor(req,res){const s=specs[req.params.resource];if(!s){res.status(404).json({error:'Unknown module.'});return null}return s}
+ router.get('/reports/overview',async(_req,res,next)=>{try{
+ const r=await pool.query(`select
+ (select count(*)::int from public.crm_leads) leads,
+ (select count(*)::int from public.crm_clients) clients,
+ (select count(*)::int from public.crm_projects) projects,
+ (select count(*)::int from public.crm_project_tasks) tasks,
+ (select count(*)::int from public.crm_project_tasks where status='done') completed_tasks,
+ (select count(*)::int from public.crm_staff where is_active) active_staff,
+ (select count(*)::int from public.crm_hr_leave_requests where status='pending') pending_leaves,
+ (select coalesce(sum(amount),0) from public.crm_invoices where status<>'void') invoiced,
+ (select coalesce(sum(paid_amount),0) from public.crm_invoices where status<>'void') received`);
+ res.json({report:r.rows[0]});
+ }catch(e){next(e)}});
+ router.put('/website/section',async(req,res,next)=>{const parsed=z.object({pageKey:z.string().regex(/^[a-z0-9_-]{1,80}$/),sectionKey:z.string().regex(/^[a-z0-9_-]{1,80}$/),content:z.record(z.unknown()).refine(x=>JSON.stringify(x).length<=8000)}).strict().safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'Invalid content.'});try{
+ const d=parsed.data;
+ const r=await pool.query(`insert into public.crm_website_content(page_key,section_key,content,updated_by)
+ values($1,$2,$3,$4) on conflict(page_key,section_key) do update set content=excluded.content,updated_by=excluded.updated_by,updated_at=now() returning *`,[d.pageKey,d.sectionKey,d.content,req.owner.id]);
+ res.json({item:r.rows[0]});
+ }catch(e){next(e)}});
  router.get('/:resource',async(req,res,next)=>{const s=specFor(req,res);if(!s)return;try{
   const sort=req.params.resource==='website'?'updated_at':'id';const r=await pool.query('select * from public.'+s.table+' order by '+sort+' desc limit 100');
   res.json({items:r.rows});
