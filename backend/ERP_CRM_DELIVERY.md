@@ -2,7 +2,7 @@
 
 ## Current status
 
-Feature implementation is saved on `development/erp-payment-workflows`, draft PR #2. Main and production feature switches are unchanged. Login parsing/CSP repairs are already deployed; the complete feature branch is not yet deployed. The existing Render staging service still points to `development/admin-crm-foundation`. The Render connector supports triggering deploys and merging environment variables but cannot change an existing service branch. Deployment requires the Dashboard branch setting to be changed to the prepared feature branch.
+Feature implementation is deployed on the isolated Render staging service from `development/erp-payment-workflows`, commit `1968433db0dad6408111f3d741b155dd3b2f4c46`. Deployment `dep-db58b4ng0jfs73b86480` is live. Auto-deploy remains off, the free plan remains unchanged, and staging Auth is confirmed as `svhdqexfcyvqnpxuszim`. The five staff, CRM, lead, client and payment-review feature flags are enabled on staging only. Main and production feature switches are unchanged. Draft PR #2 contains the implementation.
 
 ## Implemented
 
@@ -26,16 +26,16 @@ Feature implementation is saved on `development/erp-payment-workflows`, draft PR
 - Real staging rollback tests pass for payments/receipts, itemized quotations, fixed advances/audit/first-password-change defaults, five active Super Admin account/session limits, revoked-session capacity and disabled-session denial. Fixture changes were rolled back. These database checks do not replace parallel real-browser login testing.
 - Staging additive SQL 002–009 is applied. New tables have RLS enabled and no direct anon/authenticated grants. The internal `rls_auto_enable()` event trigger retains its behavior but public execution has been revoked and verified.
 
-## Concrete staging deployment
+## Live staging verification and remaining acceptance
 
-1. In https://dashboard.render.com/web/srv-db4vrb0473hc739bknmg change Branch to `development/erp-payment-workflows`. Keep auto-deploy off. Do not merge PR #2 into the base branch: the other API service auto-deploys that base and uses a different database.
-2. Keep the existing staging DATABASE_URL, Supabase keys, OWNER_USER_ID and TLS settings. On staging only enable STAFF_MANAGEMENT_ENABLED, STAFF_CRM_ENABLED, LEAD_WORKFLOW_ENABLED, CLIENT_MANAGEMENT_ENABLED and PAYMENT_REVIEW_ENABLED after confirming the staging Supabase reference `svhdqexfcyvqnpxuszim`.
-3. Deploy the exact tested feature commit and check health, pages, logo/CSS, schema, Owner sign-in and role-specific requests.
-4. Use Owner-created disposable staging accounts for Sales/HR/Accountant/Developer/delegated and non-delegated Super Admin plus two distinct clients. Exercise creation, quote acceptance, advance control, denied access, UPI handoff/QR, pending submission, bank review, re-review, balance and receipt isolation. Run five parallel Super Admin sign-ins and deny the sixth.
-5. Real mobile UPI handoff and actual bank receipt verification are required; opening an app, scanning a QR or submitting a reference is not proof of bank credit. No payment transfer was performed during automated checks.
+- Render Dashboard branch change and deployment are complete. Existing staging credentials and TLS configuration were preserved. Do not merge PR #2 into the base branch without the production release review: the other API service auto-deploys that base and uses production Supabase.
+- Live HTTP checks passed: health, all six hosted pages, logo/CSS and both configured UPI SVG QR endpoints return 200. Unauthenticated payment review and advance controls return 401. Staff-login redirects into the employee workspace. Browser inspection confirms the live client portal logo and orange/cream theme.
+- Owner sign-in was attempted through secure browser authentication. The site returned `Login could not finish: Invalid credentials or access denied.` No Owner dashboard or successful client account assignment is claimed. The supplied client email still requires verified Owner setup.
+- Authenticated acceptance remains: Owner-created disposable Sales/HR/Accountant/Developer/delegated and non-delegated Super Admin accounts, two distinct clients, quote creation/acceptance, advance controls, denied access, payment submission/re-review and receipt isolation; five parallel Super Admin sign-ins and sixth-session denial.
+- Real mobile UPI handoff and actual bank receipt verification remain required. Opening an app, scanning a QR or submitting a reference is not proof of bank credit. No payment transfer was performed during automated checks.
 
 ## Production release
 
 Production deployment, schema and feature enablement still require the previously specified Owner approval. Retain a database backup, precheck duplicate bank references, review ordered additive migrations, verify the Owner recovery redirect allowlist and validate TLS. Existing staff/Auth/session foundation must exist before ERP migrations. Supabase leaked-password protection remains disabled and needs review before production acceptance: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection. Server-only tables intentionally have no public RLS policies.
 
-This is completed, tested feature code and staging database preparation. It is not a claim of completed live deployment or real-account/mobile acceptance.
+Feature code and staging deployment are complete. Authenticated real-account acceptance and real mobile/bank payment verification remain open.
