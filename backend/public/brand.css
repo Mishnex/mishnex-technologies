@@ -3,7 +3,7 @@
 html,body{color:var(--brand-ink);font-family:Inter,Arial,system-ui,sans-serif}
 body{background:radial-gradient(circle at 85% 0,#ffe0c5,transparent 40%),linear-gradient(135deg,#fff8f1,#fff1e3);color:var(--brand-ink)}
 .company-identity{display:flex;align-items:center;gap:12px;margin:0 0 22px;color:var(--brand-ink)}
-.company-logo{width:68px;height:54px;object-fit:contain;flex:none;border-radius:10px;background:#fff}
+.company-logo{width:68px;height:54px;object-fit:contain;flex:none;border-radius:10px;background:#fff;filter:sepia(1) saturate(5) hue-rotate(335deg) drop-shadow(0 7px 14px rgba(255,105,0,.25))}
 .company-name{font-size:16px;font-weight:800;letter-spacing:.07em;line-height:1.4}.company-caption{display:block;font-size:12px;font-weight:400;letter-spacing:0;color:var(--brand-muted);margin-top:3px}
 .card,.panel{background:var(--brand-card);border-color:var(--brand-line);box-shadow:0 12px 36px #7c3a0b0b}
 .sidebar{background:linear-gradient(160deg,#fff1e3,#ffe3cc);color:var(--brand-ink);border-right:1px solid var(--brand-line)}
