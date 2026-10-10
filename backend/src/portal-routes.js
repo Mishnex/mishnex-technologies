@@ -2,6 +2,17 @@ import { Router } from 'express';
 export function portalRoutes({pool}) {
  const router=Router();
  router.use((_req,res,next)=>{res.set('Cache-Control','no-store');next()});
+ router.post('/login',async(req,res,next)=>{const {email,password}=req.body||{};if(typeof email!=='string'||typeof password!=='string'||email.length>254||password.length>1024||!email||!password)return res.status(400).json({error:'Enter a valid email and password.'});try{
+ const auth=await fetch(new URL('/auth/v1/token?grant_type=password',process.env.SUPABASE_URL),{method:'POST',headers:{apikey:process.env.SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password}),signal:AbortSignal.timeout(8000)});
+ if(!auth.ok)return res.status(401).json({error:'Invalid credentials or client access denied.'});
+ const session=await auth.json();
+ const verify=await fetch(new URL('/auth/v1/user',process.env.SUPABASE_URL),{headers:{apikey:process.env.SUPABASE_ANON_KEY,Authorization:'Bearer '+session.access_token},signal:AbortSignal.timeout(8000)});
+ if(!verify.ok)return res.status(401).json({error:'Invalid session.'});
+ const user=await verify.json();
+ const allowed=await pool.query('select 1 from public.crm_client_portal_access where user_id=$1 limit 1',[user.id]);
+ if(!allowed.rowCount)return res.status(403).json({error:'Client portal access not assigned.'});
+ res.json({accessToken:session.access_token,expiresIn:session.expires_in});
+ }catch(e){next(e)}});
  router.use(async(req,res,next)=>{
   const match=/^Bearer (\S+)$/.exec(req.get('Authorization')||'');
   if(!match)return res.status(401).json({error:'Client sign in required.'});
