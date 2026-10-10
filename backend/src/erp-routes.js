@@ -26,9 +26,9 @@ export function erpRoutes({pool,requireOwner}) {
  (select count(*)::int from public.crm_project_tasks where status='done') completed_tasks,
  (select count(*)::int from public.crm_staff where is_active) active_staff,
  (select count(*)::int from public.crm_hr_leave_requests where status='pending') pending_leaves,
- (select coalesce(sum(amount),0) from public.crm_invoices where status<>'void') invoiced,
- (select coalesce(sum(paid_amount),0) from public.crm_invoices where status<>'void') received`);
- res.json({report:r.rows[0]});
+ (select count(*)::int from public.crm_invoices where status not in ('paid','void')) open_invoices`);
+ const financial=await pool.query(`select currency,coalesce(sum(amount),0)::text invoiced,coalesce(sum(paid_amount),0)::text received,coalesce(sum(amount-paid_amount),0)::text outstanding from public.crm_invoices where status<>'void' group by currency order by currency`);
+ res.json({report:r.rows[0],financial:financial.rows});
  }catch(e){next(e)}});
  router.put('/website/section',async(req,res,next)=>{const parsed=z.object({pageKey:z.string().regex(/^[a-z0-9_-]{1,80}$/),sectionKey:z.string().regex(/^[a-z0-9_-]{1,80}$/),content:z.record(z.unknown()).refine(x=>JSON.stringify(x).length<=8000)}).strict().safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'Invalid content.'});try{
  const d=parsed.data;
