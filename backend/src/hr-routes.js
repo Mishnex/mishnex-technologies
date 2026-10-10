@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { permissionsFor } from './staff-permissions.js';
 import { tokenIssuedAfterCutoff } from './staff-session.js';
@@ -17,6 +18,11 @@ export function hrRoutes({pool,requireOwner}) {
    const result=await pool.query('select user_id,role,is_active,must_change_password,sessions_valid_after from public.crm_staff where user_id=$1',[user.id]);
    const staff=result.rows[0];
    if(!staff?.is_active||staff.must_change_password||!tokenIssuedAfterCutoff(bearer[1],staff.sessions_valid_after))return res.status(403).json({error:'Staff access denied.'});
+   if(staff.role==='super_admin'){
+    const fingerprint=createHash('sha256').update(bearer[1]).digest('hex');
+    const active=await pool.query('select 1 from public.crm_super_admin_sessions where user_id=$1 and token_fingerprint=$2 and revoked_at is null and expires_at>now()',[user.id,fingerprint]);
+    if(!active.rowCount)return res.status(401).json({error:'Super Admin session revoked.'});
+   }
    req.hrActor={id:user.id,owner:false,permissions:permissionsFor(staff)};
    next();
   }catch(error){next(error)}
