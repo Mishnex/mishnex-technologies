@@ -11,6 +11,7 @@ import { leadSchema } from './validation.js';
 import { staffRoutes } from './staff.js';
 import { hrRoutes } from './hr-routes.js';
 import { erpRoutes } from './erp-routes.js';
+import { pageSecurity } from './page-security.js';
 import { portalRoutes } from './portal-routes.js';
 import { leadWorkflowRoutes } from './lead-routes.js';
 import { clientRoutes } from './client-routes.js';
@@ -88,6 +89,8 @@ app.get('/client-portal', async (_req,res,next)=>{try{
 app.get('/staff-login', async (_req, res, next) => {
   try {
     const page = await readFile(fileURLToPath(new URL('../public/staff-login.html', import.meta.url)), 'utf8');
+    res.set('Content-Security-Policy',pageSecurity(page,{supabase:false}));
+    res.set('X-Robots-Tag','noindex, nofollow');
     res.set('Cache-Control', 'no-store');
     res.type('html').send(page);
   } catch (error) { next(error); }
@@ -95,6 +98,8 @@ app.get('/staff-login', async (_req, res, next) => {
 app.get('/forgot-password', async (_req, res, next) => {
   try {
     const page = await readFile(fileURLToPath(new URL('../public/forgot-password.html', import.meta.url)), 'utf8');
+    res.set('Content-Security-Policy',pageSecurity(page,{supabase:false}));
+    res.set('X-Robots-Tag','noindex, nofollow');
     res.set('Cache-Control', 'no-store');
     res.type('html').send(page);
   } catch (error) { next(error); }
@@ -102,6 +107,8 @@ app.get('/forgot-password', async (_req, res, next) => {
 app.get('/reset-password', async (_req, res, next) => {
   try {
     const page = await readFile(fileURLToPath(new URL('../public/reset-password.html', import.meta.url)), 'utf8');
+    res.set('Content-Security-Policy',pageSecurity(page,{supabase:true}));
+    res.set('X-Robots-Tag','noindex, nofollow');
     res.set('Cache-Control', 'no-store');
     res.type('html').send(page);
   } catch (error) { next(error); }
