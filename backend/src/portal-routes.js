@@ -13,6 +13,7 @@ export function portalRoutes({pool}) {
    req.clientUserId=user.id;next();
   }catch(e){next(e)}
  });
+ router.get('/health',(_req,res)=>res.json({status:'ok'}));
  router.get('/overview',async(req,res,next)=>{try{
   const memberships=await pool.query('select c.id,c.name,c.email from public.crm_client_portal_access a join public.crm_clients c on c.id=a.client_id where a.user_id=$1 order by c.created_at desc',[req.clientUserId]);
   res.json({clients:memberships.rows});
