@@ -42,3 +42,15 @@ Staff login and Owner password recovery pages also inherited Helmet's default CS
 The staging advisor also reports pre-existing public execution grants on `rls_auto_enable()` and disabled leaked-password protection. These were not silently changed. Review them before production security sign-off. Intentional server-only RLS tables have no public policies.
 
 This delivery is tested development code plus deployed login repairs. Full production/auth/browser acceptance is still outstanding; it is not a 100% production-ready claim.
+
+## Itemized quotation update — 10 October 2026
+
+The quotation screen now captures client name/email/phone, an existing or new client, and up to 50 product/service lines with unit price and integer quantity. The browser previews totals; the server calculates and stores subtotal, discount and final total in integer paisa/cents. Client contact and 30%-default advance policy are saved with the quotation.
+
+Sales can create normal quotations and request Owner approval for discounted/below-floor drafts. Approved/sent quotations can generate a private 30-day link, copied or shared through user-operated WhatsApp/email compose links. Token secrets appear only in the URL fragment and request headers; the database stores hashes. New links revoke previous links, and the creating salesman or Owner can disable them.
+
+The shared quotation page shows all items and client details, print/PDF option, verified payments and remaining balance. It offers default advance/custom part payment and full remaining payment, plus a UPI app link for INR quotations. Customers explicitly accept the quotation and submit the bank reference. No customer panel account is required for this specific quotation link. It does not grant access to other client records. The authenticated client portal also displays its own itemized quotations after Owner membership assignment.
+
+Payment review remains manual. Shared-link submissions have no signed-in user ID and are audited as `client_link`; a database constraint still requires an authenticated actor for approval/rejection/reopening. A locked quotation binds acceptance to one matching invoice. Itemized quotation financial data is immutable; revisions require a new quotation.
+
+Validation: 170 Node tests pass. DOM checks exercised a 2 × 15000 + 3 × 1000 = 33000 quotation, client fields, 30% advance, full balance and custom part-payment selection, and safe text rendering. The additive `sql/004_itemized_quotations.sql` schema was applied to isolated staging only. A real PostgreSQL rollback check validated saved line totals, private link expiry and denial of anonymous payment decisions. Full real-browser/Auth acceptance and feature deployment remain outstanding.

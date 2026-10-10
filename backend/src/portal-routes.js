@@ -45,8 +45,8 @@ export function portalRoutes({pool}) {
  router.get('/payment-config',async(_req,res,next)=>{try{const r=await pool.query('select upi_id,advance_percent from public.crm_business_policy where singleton');res.json({policy:r.rows[0]||{upi_id:'',advance_percent:30}})}catch(e){next(e)}});
  router.get('/clients/:clientId/quotations',async(req,res,next)=>{
   const clientId=z.string().uuid().safeParse(req.params.clientId);if(!clientId.success)return res.status(400).json({error:'Invalid client.'});
-  try{const r=await pool.query(`select q.id,q.title,q.amount,q.currency,q.status,p.advance_percent,round(q.amount*p.advance_percent/100,2) as advance_amount
-   from public.crm_quotations q cross join public.crm_business_policy p where q.client_id=$1 and q.status in ('sent','accepted')
+  try{const r=await pool.query(`select q.id,q.title,q.amount,q.currency,q.status,q.advance_percent,round(q.amount*q.advance_percent/100,2) as advance_amount,q.items,q.subtotal,q.discount_amount,q.notes,q.client_name,q.client_email,q.client_phone
+   from public.crm_quotations q where q.client_id=$1 and q.status in ('sent','accepted')
    and exists(select 1 from public.crm_client_portal_access a where a.client_id=q.client_id and a.user_id=$2) order by q.id desc limit 100`,[clientId.data,req.clientUserId]);res.json({quotations:r.rows})}catch(e){next(e)}
  });
  router.post('/invoices/:id/payments',paymentGate,async(req,res,next)=>{

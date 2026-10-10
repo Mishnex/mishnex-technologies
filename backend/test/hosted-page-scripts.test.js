@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {Script} from 'node:vm';
 import {createHash} from 'node:crypto';
 import {pageSecurity} from '../src/page-security.js';
-for(const name of ['admin-panel','client-portal','staff-login','forgot-password','reset-password'])test(name+' hosted script parses and is allowed by its CSP',async()=>{
+for(const name of ['admin-panel','client-portal','staff-login','forgot-password','reset-password','quotation'])test(name+' hosted script parses and is allowed by its CSP',async()=>{
  const page=await readFile(new URL('../public/'+name+'.html',import.meta.url),'utf8');
  const scripts=[...page.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.ok(scripts.length);
  const csp=pageSecurity(page,{supabase:name==='reset-password'});
