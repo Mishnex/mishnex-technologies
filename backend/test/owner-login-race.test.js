@@ -136,3 +136,57 @@ test('sign-out resets disabled login and invalidates an outstanding login respon
   assert.equal(adminApp.hidden,true);
   assert.equal(submit.disabled,false);
 });
+
+test('logout followed by a new login ignores the older response',async()=>{
+  const source=readFileSync(new URL('../../assets/js/admin.js',import.meta.url),'utf8');
+  const signoutStart=source.indexOf('function signOut() {');
+  const signoutEnd=source.indexOf("\ndocument.getElementById('signOutButton')",signoutStart);
+  const loginStart=source.indexOf("loginForm.addEventListener('submit', async event => {");
+  const loginEnd=source.indexOf("\nasync function loadLeads()",loginStart);
+  assert.ok(signoutStart>=0&&signoutEnd>signoutStart&&loginStart>=0&&loginEnd>loginStart);
+  const pending=[];
+  const submit={disabled:false};
+  const loginMessage={textContent:''};
+  const loginScreen={hidden:false};
+  const adminApp={hidden:true};
+  const loginForm={reset(){},addEventListener(_name,handler){this.handler=handler;}};
+  const empty={replaceChildren(){}};
+  let leadsLoaded=0;
+  const context={
+    loginForm,loginMessage,loginScreen,adminApp,
+    ownerLoginRequestId:0,ownerAccessToken:null,leadListRequestId:0,
+    apiOrigin:'https://example.invalid',
+    leadResults:empty,staffList:empty,staffStatus:{textContent:''},leadFeedback:{textContent:''},
+    credentialBox:{hidden:false},credentialValue:{textContent:'temporary'},
+    staffPanel:{hidden:false},leadPanel:{hidden:false},
+    document:{
+      getElementById(id){
+        if(id==='loginSubmit')return submit;
+        if(id==='ownerEmail')return {value:'owner@example.com'};
+        if(id==='ownerPassword')return {value:'password'};
+        if(id==='liveLeads')return null;
+        throw Error('Unexpected DOM ID: '+id);
+      },
+      querySelector(){return null;}
+    },
+    fetch:()=>new Promise(resolve=>pending.push(resolve)),
+    loadLeads:async()=>{leadsLoaded++;}
+  };
+  vm.createContext(context);
+  vm.runInContext(source.slice(signoutStart,signoutEnd)+'\n'+source.slice(loginStart,loginEnd),context);
+  const oldLogin=loginForm.handler({preventDefault(){}});
+  vm.runInContext('signOut()',context);
+  const newLogin=loginForm.handler({preventDefault(){}});
+  assert.equal(submit.disabled,true);
+  pending[0]({ok:true,json:async()=>({accessToken:'old-token'})});
+  await oldLogin;
+  assert.equal(context.ownerAccessToken,null);
+  assert.equal(submit.disabled,true,'stale completion must not unlock newer login');
+  pending[1]({ok:true,json:async()=>({accessToken:'new-token'})});
+  await newLogin;
+  assert.equal(context.ownerAccessToken,'new-token');
+  assert.equal(leadsLoaded,1);
+  assert.equal(submit.disabled,false);
+  assert.equal(loginScreen.hidden,true);
+  assert.equal(adminApp.hidden,false);
+});
