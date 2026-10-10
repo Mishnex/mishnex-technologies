@@ -54,3 +54,9 @@ The shared quotation page shows all items and client details, print/PDF option, 
 Payment review remains manual. Shared-link submissions have no signed-in user ID and are audited as `client_link`; a database constraint still requires an authenticated actor for approval/rejection/reopening. A locked quotation binds acceptance to one matching invoice. Itemized quotation financial data is immutable; revisions require a new quotation.
 
 Validation: 170 Node tests pass. DOM checks exercised a 2 × 15000 + 3 × 1000 = 33000 quotation, client fields, 30% advance, full balance and custom part-payment selection, and safe text rendering. The additive `sql/004_itemized_quotations.sql` schema was applied to isolated staging only. A real PostgreSQL rollback check validated saved line totals, private link expiry and denial of anonymous payment decisions. Full real-browser/Auth acceptance and feature deployment remain outstanding.
+
+## Multiple receiving UPI accounts
+
+Owner policy now supports primary and secondary receiving UPI IDs plus receiver name. The quotation page and signed-in client portal let customers select the account and part/full INR amount. The Pay via UPI link and locally generated QR encode the same selected account and amount; no external QR service receives these details. QR generation accepts only configured receiving accounts, validates amount precision and applies rate limits. Changing recipient/amount does not create or confirm a payment. Existing manual bank review, audit, pending status and client isolation remain required.
+
+Apply `backend/sql/005_multiple_upi_options.sql` before deploying this version. Both customer-provided receiving IDs and receiver name have been configured only in the staging policy; these are runtime Owner settings, not hardcoded in source. Production deployment/configuration and real mobile UPI payment testing remain outstanding.

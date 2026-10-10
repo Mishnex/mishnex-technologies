@@ -16,8 +16,8 @@ export function quoteLinkRoutes({pool}){
   const effectiveInvoice=invoice.rows.length===1?invoice.rows[0]:null;
   const payments=effectiveInvoice?await pool.query('select id,amount,reference,status,reason,created_at,reviewed_at from public.crm_payment_submissions where invoice_id=$1 order by id desc limit 100',[effectiveInvoice.id]):{rows:[]};
   const paid=Number(effectiveInvoice?.paid_amount||0),{payment_invoice_id,client_id,...quotation}=q;
-  const policy=await pool.query('select upi_id from public.crm_business_policy where singleton');
-  res.json({quotation,paidAmount:paid,remainingAmount:Math.max(0,Number(q.amount)-paid),payments:payments.rows,upiId:q.currency.trim()==='INR'?policy.rows[0]?.upi_id||'':'',canPay:q.currency.trim()==='INR'&&invoice.rows.length<=1&&!['void','draft'].includes(effectiveInvoice?.status)&&process.env.PAYMENT_REVIEW_ENABLED==='true'});
+  const policy=await pool.query('select upi_id,upi_secondary_id,upi_receiver_name from public.crm_business_policy where singleton');
+  res.json({quotation,paidAmount:paid,remainingAmount:Math.max(0,Number(q.amount)-paid),payments:payments.rows,upiId:q.currency.trim()==='INR'?policy.rows[0]?.upi_id||'':'',upiOptions:q.currency.trim()==='INR'?[...new Set([policy.rows[0]?.upi_id,policy.rows[0]?.upi_secondary_id].filter(Boolean))]:[],upiReceiverName:policy.rows[0]?.upi_receiver_name||'',canPay:q.currency.trim()==='INR'&&invoice.rows.length<=1&&!['void','draft'].includes(effectiveInvoice?.status)&&process.env.PAYMENT_REVIEW_ENABLED==='true'});
  }catch(e){next(e)}});
  r.post('/payments',async(req,res,next)=>{
   if(process.env.PAYMENT_REVIEW_ENABLED!=='true')return res.status(503).json({error:'Payment review is disabled.'});

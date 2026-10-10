@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import express from 'express';
+import QRCode from 'qrcode';
+import {upiRoutes} from '../src/upi-routes.js';
+async function withServer(fn){const calls=[];const app=express();app.use('/api/public',upiRoutes({pool:{query:async(sql)=>{calls.push(sql);return {rows:[{upi_id:'first@bank',upi_secondary_id:'second@bank',upi_receiver_name:'VISHAL KUMAR'}]}}}}));const server=app.listen(0,'127.0.0.1');try{await new Promise(r=>server.once('listening',r));await fn('http://127.0.0.1:'+server.address().port,calls)}finally{await new Promise(r=>server.close(r))}}
+for(const account of ['first@bank','second@bank'])test('QR encodes exact selected receiving account and part/full amount: '+account,()=>withServer(async(base)=>{for(const amount of ['9900.00','33000.00']){const r=await fetch(base+'/api/public/upi-qr?'+new URLSearchParams({account,amount}));assert.equal(r.status,200);assert.match(r.headers.get('content-type'),/image\/svg\+xml/);assert.equal(r.headers.get('cache-control'),'no-store');const uri='upi://pay?'+new URLSearchParams({pa:account,pn:'VISHAL KUMAR',am:amount,cu:'INR'});assert.equal(await r.text(),await QRCode.toString(uri,{type:'svg',errorCorrectionLevel:'M',margin:4,width:240}))}}));
+test('QR rejects unknown receiving account instead of encoding attacker recipient',()=>withServer(async(base)=>{const r=await fetch(base+'/api/public/upi-qr?account=attacker%40bank&amount=10');assert.equal(r.status,400)}));
+test('QR rejects malformed, zero, overprecision and oversized amounts before database query',()=>withServer(async(base,calls)=>{for(const amount of ['0','-1','10.123','1e2','99999999999','<script>']){const r=await fetch(base+'/api/public/upi-qr?'+new URLSearchParams({account:'first@bank',amount}));assert.equal(r.status,400)}assert.equal(calls.length,0)}));

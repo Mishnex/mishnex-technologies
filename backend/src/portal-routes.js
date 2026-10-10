@@ -42,7 +42,7 @@ export function portalRoutes({pool}) {
   res.json({invoices:result.rows});
  }catch(e){if(e.code==='22P02')return res.status(400).json({error:'Invalid client ID.'});next(e)}});
  const paymentGate=(_req,res,next)=>process.env.PAYMENT_REVIEW_ENABLED==='true'?next():res.status(503).json({error:'Payment review is disabled.'});
- router.get('/payment-config',async(_req,res,next)=>{try{const r=await pool.query('select upi_id,advance_percent from public.crm_business_policy where singleton');res.json({policy:r.rows[0]||{upi_id:'',advance_percent:30}})}catch(e){next(e)}});
+ router.get('/payment-config',async(_req,res,next)=>{try{const r=await pool.query('select upi_id,upi_secondary_id,upi_receiver_name,advance_percent from public.crm_business_policy where singleton');res.json({policy:r.rows[0]||{upi_id:'',advance_percent:30}})}catch(e){next(e)}});
  router.get('/clients/:clientId/quotations',async(req,res,next)=>{
   const clientId=z.string().uuid().safeParse(req.params.clientId);if(!clientId.success)return res.status(400).json({error:'Invalid client.'});
   try{const r=await pool.query(`select q.id,q.title,q.amount,q.currency,q.status,q.advance_percent,round(q.amount*q.advance_percent/100,2) as advance_amount,q.items,q.subtotal,q.discount_amount,q.notes,q.client_name,q.client_email,q.client_phone
