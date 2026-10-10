@@ -198,10 +198,12 @@ staffForm.addEventListener('submit', async event => {
   submit.disabled = true;
   credentialBox.hidden = true;
   staffStatus.textContent = 'Creating employee...';
+  let employeeCreated = false;
   try {
     const fields = new FormData(staffForm);
     const result = await staffRequest('/', { method:'POST', body:JSON.stringify(Object.fromEntries(fields)) });
     if (requestToken !== ownerAccessToken || staffPanel.hidden) return;
+    employeeCreated = true;
     staffForm.reset();
     credentialValue.textContent = result.temporaryPassword;
     credentialBox.hidden = false;
@@ -209,7 +211,13 @@ staffForm.addEventListener('submit', async event => {
     await loadStaffPanel();
     if (requestToken !== ownerAccessToken || staffPanel.hidden) return;
     staffStatus.textContent = result.warning || 'Employee created. Copy the temporary password securely.';
-  } catch (error) { if (requestToken === ownerAccessToken && !staffPanel.hidden) staffStatus.textContent = error.message; }
+  } catch (error) {
+    if (requestToken === ownerAccessToken && !staffPanel.hidden) {
+      staffStatus.textContent = employeeCreated
+        ? 'Employee was created successfully. Staff list refresh failed; do not create the employee again. Copy the temporary password and refresh the list later.'
+        : error.message;
+    }
+  }
   finally { submit.disabled = false; }
 });
 
