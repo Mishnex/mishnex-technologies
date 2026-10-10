@@ -3,7 +3,8 @@ export const rolePermissions = Object.freeze({
   manager: Object.freeze(['leads:read','leads:manage','quotations:read','quotations:manage','projects:read','projects:manage','reports:read']),
   sales: Object.freeze(['leads:read','quotations:read']),
   developer: Object.freeze(['projects:read']),
-  accountant: Object.freeze(['payments:read','reports:read'])
+  accountant: Object.freeze(['payments:read','reports:read']),
+  hr: Object.freeze(['hr:employees:read','hr:employees:manage','hr:attendance:read','hr:attendance:manage','hr:leave:read','hr:leave:approve'])
 });
 export function permissionsFor(staff) {
   if (!staff || !staff.is_active || staff.must_change_password) return [];
