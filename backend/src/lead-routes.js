@@ -87,16 +87,23 @@ export function leadWorkflowRoutes({ pool, requireOwner }) {
     const parsed = z.string().uuid().safeParse(req.params.leadId);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid lead ID.' });
     try {
-      const exists = await pool.query('SELECT 1 FROM public.crm_leads WHERE id=$1', [parsed.data]);
-      if (!exists.rowCount) return res.status(404).json({ error: 'Lead not found.' });
       const result = await pool.query(
         `SELECT a.id,a.from_status,a.to_status,a.note,a.created_at
-         FROM public.crm_lead_activity a
-         WHERE a.lead_id=$1
-         ORDER BY a.created_at DESC,a.id DESC LIMIT 100`,
+         FROM public.crm_leads l
+         LEFT JOIN LATERAL (
+           SELECT id,from_status,to_status,note,created_at
+           FROM public.crm_lead_activity
+           WHERE lead_id=l.id
+           ORDER BY created_at DESC,id DESC
+           LIMIT 100
+         ) a ON true
+         WHERE l.id=$1
+         ORDER BY a.created_at DESC NULLS LAST,a.id DESC NULLS LAST`,
         [parsed.data]
       );
-      return res.json({ leadId:parsed.data, activity:result.rows });
+      if (!result.rowCount) return res.status(404).json({ error: 'Lead not found.' });
+      const activity = result.rows.filter(row => row.id !== null);
+      return res.json({ leadId:parsed.data, activity });
     } catch (error) { next(error); }
   });
   return router;
