@@ -16,6 +16,10 @@ Owner-only Employee activity reports accept a date range (India time, up to 366 
 
 Task/project/invoice mutations and work logs save in one transaction. Unchanged done-task saves do not inflate completions. Existing quotation creation and lead histories supply older records; other work tracking starts with this deployment. Tracking is for recorded CRM activity, not automatic phone/device monitoring or all historical employee work. Staging SQL 011 is applied with RLS and no direct public grants. 212 automated tests pass, plus Owner report DOM checks and real staging rollback assertion for India midnight boundaries. Production unchanged.
 
+## Mishnex role prefixes
+
+SQL 012 changes display codes to MISH-SL (Sales), MISH-SA (Super Admin), MISH-HR, MISH-DV (Developer), MISH-MG (Manager), MISH-AC (Accountant), MISH-CL (Client), MISH-QT (Quotation), and MISH-OWN-000001 (configured Owner). Numbers keep their existing allocation; UUID primary keys and email/password sign-in are unchanged. Employee prefixes are assigned at creation and remain stable even if the current role later changes; current role is shown separately in the header. A database trigger prevents identity-prefix/number changes. Existing staging records are reformatted without renumbering.
+
 ## Implemented
 
 - Individual staff credentials, Owner-only provisioning/deactivation, first-login password change and live role/session checks. Database caps retain five active Super Admin accounts and five active Super Admin sessions. Enabled staff sign-in leads to the shared role-specific workspace.

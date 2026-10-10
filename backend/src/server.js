@@ -224,7 +224,7 @@ app.use('/api/admin/lead-workflow', leadWorkflowRoutes({ pool, requireOwner }));
 app.use('/api/admin/clients', clientRoutes({ pool, requireOwner }));
 app.get('/api/admin/me', requireOwner, (req, res) => {
   res.set('Cache-Control', 'no-store');
-  res.json({ id: req.owner.id, accountCode: 'OWN-000001', fullName: req.owner.user_metadata?.full_name || req.owner.user_metadata?.name || 'Owner', email: req.owner.email, role: 'owner' });
+  res.json({ id: req.owner.id, accountCode: 'MISH-OWN-000001', fullName: req.owner.user_metadata?.full_name || req.owner.user_metadata?.name || 'Owner', email: req.owner.email, role: 'owner' });
 });
 app.get('/api/admin/leads', requireOwner, async (req, res, next) => {
   const rawStatus = req.query.status;
