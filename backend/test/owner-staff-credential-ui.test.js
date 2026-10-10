@@ -64,5 +64,7 @@ test('staff refresh rejection does not hide already displayed one-time password'
   await staffForm.handler({preventDefault(){}});
   assert.equal(credentialValue.textContent,'one-time-secret');
   assert.equal(credentialBox.hidden,false);
+  assert.match(staffStatus.textContent,/Employee was created successfully/);
+  assert.match(staffStatus.textContent,/do not create the employee again/);
   assert.equal(submit.disabled,false);
 });
