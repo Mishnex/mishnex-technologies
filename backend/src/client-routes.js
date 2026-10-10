@@ -38,6 +38,9 @@ export function clientRoutes({pool,requireOwner}) {
       return res.json({clients:result.rows});
     }catch(error){next(error);}
   });
+  router.get('/:clientId/portal-users',async(req,res,next)=>{const id=z.string().uuid().safeParse(req.params.clientId);if(!id.success)return res.status(400).json({error:'Invalid client ID.'});try{const r=await pool.query('select user_id,created_at from public.crm_client_portal_access where client_id=$1 order by created_at desc',[id.data]);res.json({users:r.rows})}catch(e){next(e)}});
+  router.post('/:clientId/portal-users',async(req,res,next)=>{const id=z.string().uuid().safeParse(req.params.clientId),body=z.object({userId:z.string().uuid()}).strict().safeParse(req.body);if(!id.success||!body.success)return res.status(400).json({error:'Invalid client or user ID.'});try{const r=await pool.query('insert into public.crm_client_portal_access(client_id,user_id) values($1,$2) on conflict do nothing returning user_id',[id.data,body.data.userId]);res.status(r.rowCount?201:200).json({linked:true})}catch(e){if(e.code==='23503')return res.status(404).json({error:'Client or authentication user not found.'});next(e)}});
+  router.delete('/:clientId/portal-users/:userId',async(req,res,next)=>{const id=z.string().uuid().safeParse(req.params.clientId),user=z.string().uuid().safeParse(req.params.userId);if(!id.success||!user.success)return res.status(400).json({error:'Invalid client or user ID.'});try{await pool.query('delete from public.crm_client_portal_access where client_id=$1 and user_id=$2',[id.data,user.data]);res.json({revoked:true})}catch(e){next(e)}});
   router.post('/from-lead/:leadId',async(req,res,next)=>{
     const leadId=z.string().uuid().safeParse(req.params.leadId);
     if(!leadId.success||req.body===null||typeof req.body!=='object'||Array.isArray(req.body)||Object.keys(req.body).length){
