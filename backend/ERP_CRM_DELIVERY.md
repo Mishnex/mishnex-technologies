@@ -1,70 +1,41 @@
 # Mishnex ERP/CRM delivery — 10 October 2026
 
-The existing project was continued. Main was not changed. Production feature switches were not enabled.
+## Current status
 
-## Login repairs deployed separately
+Feature implementation is saved on `development/erp-payment-workflows`, draft PR #2. Main and production feature switches are unchanged. Login parsing/CSP repairs are already deployed; the complete feature branch is not yet deployed. The existing Render staging service still points to `development/admin-crm-foundation`. The Render connector supports triggering deploys and merging environment variables but cannot change an existing service branch. Deployment requires the Dashboard branch setting to be changed to the prepared feature branch.
 
-The hosted admin workspace contained an unescaped apostrophe in a JavaScript string. The browser could not parse any of the script, so login handlers never registered. This was reproduced against the original source and repaired on the existing development branch.
+## Implemented
 
-Staff login and Owner password recovery pages also inherited Helmet's default CSP, which blocked their inline scripts. They now use hashes of their exact scripts. Script execution remains restricted; script `unsafe-inline` was not enabled. All five hosted page scripts have a parsing/CSP regression check.
+- Individual staff credentials, Owner-only provisioning/deactivation, first-login password change and live role/session checks. Database caps retain five active Super Admin accounts and five active Super Admin sessions. Enabled staff sign-in leads to the shared role-specific workspace.
+- Leads/history, client conversion, projects/tasks, HR employees/attendance/leave, invoices, reports and website CMS. Developers only access assigned work. Owner controls account lifecycle; permitted roles access their modules.
+- Client quotations capture contact name/email/phone and up to 50 product/service lines with price and integer quantity. Server-calculated cents determine subtotal, discount and total. Below-floor/discounted quotations require Owner approval.
+- Sales can copy private quotation links or open WhatsApp/email compose links. Tokens are hashes in the database and URL fragments in the browser; only that quotation's data/payment history is available. Links expire after 30 days and can be rotated/revoked.
+- Both supplied UPI IDs and receiver name are staging runtime settings. Customer selects account and part/full INR amount. Locally generated QR and UPI app link encode the same recipient and amount; no external QR provider receives them.
+- Owner and explicitly delegated active Super Admins control default advance percentage and quotation-specific percentage/fixed amount. Sales/HR/Accountant/Manager/Developer cannot change terms. Customers cannot bypass the saved minimum advance through the API. Full remaining payment is allowed. Terms cannot change after payment submissions start. Changes include actor, role, previous/new terms, timestamp and reason in Owner-readable audit.
+- Quotation acceptance from a private link or signed-in client portal atomically prepares one matching invoice. Client memberships constrain all portal quotation, project, invoice, payment and receipt access.
+- Owner creates/links client portal logins by email, removing the need to type Auth UUIDs. New logins get one-time temporary credentials and must change their password before portal data is available. Existing account passwords are preserved. Ambiguous commits require reconciliation rather than destructive Auth cleanup.
+- Payment references remain pending until manual bank verification. Only Owner/delegated Super Admin approves/rejects/reopens. Delays do not reject. Rejected payments can be reviewed and approved later. Decisions atomically update ledger/balance/audit; repeat approvals and cross-invoice reuse of the same bank reference cannot double-credit.
+- Customer acknowledgement shows reported amount/reference, total, verified paid and remaining balance. Expected balance after pending approval is clearly labelled. Refresh shows confirmed status only after approval. Approved receipt details are available in the authenticated portal.
+- Shared original logo and website orange/cream theme cover Owner/staff/client panels, recovery, quotation/payment links and quotation Print / Save PDF. Public brand routes expose only the exact logo and CSS.
 
-## Implemented development workflows
+## Verification
 
-- Existing Owner/staff account creation, password reset/change, deactivation and five Super Admin account/session caps retained.
-- Existing leads, status history, won-lead client conversion and Owner-controlled client portal memberships retained.
-- Projects and tasks: create/update status, select clients and staff by name; developers read assigned projects/tasks and update only their own task status.
-- Quotations: normal Sales quotations, per-currency minimum amounts, Owner approval before sending below-floor or discounted quotes.
-- Invoices: match accepted quotations; issued financial fields cannot be edited or moved to another client. Paid status can only come from reviewed payments.
-- Payment submission: a client submits a UPI reference against their own issued invoice. It remains pending until a bank transaction is manually verified.
-- Review: Owner or explicitly delegated active Super Admin approves/rejects/reopens payments. Sales, HR and Accountant cannot decide payments. No delay-based rejection exists.
-- Approval updates the payment ledger, invoice balance and actor/role/action/reason/time audit in one transaction. Repeated approvals do not credit again; uncertain COMMIT returns a reconciliation warning.
-- Client portal: own quotations, projects, invoice totals, amount paid, remaining balance, submitted payment history and approved receipt details.
-- Owner-only business policy: receiving UPI ID, advance percentage (default 30%), quotation minimums.
-- Existing HR employee profiles, attendance, leave decisions and currency-separated reports retained. HR now uses the shared live staff/session checks and feature gates.
+- 198 automated Node tests pass: role/delegation restrictions, invoice and client isolation, first-password-change/session cutoff, pricing/precision, locked advance changes, rollback/ambiguous commit, duplicate bank reference, quote-link privacy and local QR recipient/amount.
+- DOM smoke checks pass for itemized totals, part/full payment, pending-to-confirmed balance display, Owner fixed/default advance controls and safe text/private token use. These are mocked API checks, not live Auth or browser acceptance.
+- Local HTTP server returns 200 for all six hosted pages, health, brand CSS and byte-identical original company logo. Scripts parse and their CSP hashes are valid.
+- Real staging rollback tests pass for payments/receipts, itemized quotations, fixed advances/audit/first-password-change defaults, five active Super Admin account/session limits, revoked-session capacity and disabled-session denial. Fixture changes were rolled back. These database checks do not replace parallel real-browser login testing.
+- Staging additive SQL 002–009 is applied. New tables have RLS enabled and no direct anon/authenticated grants. The internal `rls_auto_enable()` event trigger retains its behavior but public execution has been revoked and verified.
 
-## Validation completed
+## Concrete staging deployment
 
-- 146 Node tests pass, including authorization, client payment isolation, duplicate approval, rollback and ambiguous COMMIT cases.
-- Admin login, eight module screens and sign-out passed a DOM smoke test with mocked API responses.
-- New payment/policy schema applied only to `mishnex-crm-staging`.
-- Real staging PostgreSQL transaction test inserted a test client, invoice, payment, ledger and audit, checked duplicate-reference rejection, remaining balance and receipt membership filtering, then rolled back all test records.
-- RLS is enabled on all four new tables and anon/authenticated have no direct table grants. Access stays behind the server API.
+1. In https://dashboard.render.com/web/srv-db4vrb0473hc739bknmg change Branch to `development/erp-payment-workflows`. Keep auto-deploy off. Do not merge PR #2 into the base branch: the other API service auto-deploys that base and uses a different database.
+2. Keep the existing staging DATABASE_URL, Supabase keys, OWNER_USER_ID and TLS settings. On staging only enable STAFF_MANAGEMENT_ENABLED, STAFF_CRM_ENABLED, LEAD_WORKFLOW_ENABLED, CLIENT_MANAGEMENT_ENABLED and PAYMENT_REVIEW_ENABLED after confirming the staging Supabase reference `svhdqexfcyvqnpxuszim`.
+3. Deploy the exact tested feature commit and check health, pages, logo/CSS, schema, Owner sign-in and role-specific requests.
+4. Use Owner-created disposable staging accounts for Sales/HR/Accountant/Developer/delegated and non-delegated Super Admin plus two distinct clients. Exercise creation, quote acceptance, advance control, denied access, UPI handoff/QR, pending submission, bank review, re-review, balance and receipt isolation. Run five parallel Super Admin sign-ins and deny the sixth.
+5. Real mobile UPI handoff and actual bank receipt verification are required; opening an app, scanning a QR or submitting a reference is not proof of bank credit. No payment transfer was performed during automated checks.
 
-## Required before releasing the new workflows
+## Production release
 
-1. Deploy the feature branch to the existing staging service; do not merge it into an auto-deploying service until its database schema and feature gates are reviewed.
-2. Apply `sql/002_payment_review.sql` and `sql/003_business_policy.sql` after the existing migrations. These are already present on isolated staging only.
-3. Enable `PAYMENT_REVIEW_ENABLED=true` on staging; configure receiving UPI ID and quote floors in Owner settings. Keep production disabled until acceptance.
-4. Test actual Owner, Sales, HR, Accountant, Developer, delegated and non-delegated Super Admin, and two separate clients with real Auth sessions. Recheck five concurrent accounts/sessions and deactivation with real concurrency.
-5. Verify the Owner-email recovery configuration, database TLS certificate and all forms in a real browser. Headless Chromium download was blocked in this environment; DOM checks do not substitute for browser/layout or real Auth tests.
-6. Obtain Owner production rollout approval, retain a database backup, review additive migrations and rehearse rollback before enabling production.
+Production deployment, schema and feature enablement still require the previously specified Owner approval. Retain a database backup, precheck duplicate bank references, review ordered additive migrations, verify the Owner recovery redirect allowlist and validate TLS. Existing staff/Auth/session foundation must exist before ERP migrations. Supabase leaked-password protection remains disabled and needs review before production acceptance: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection. Server-only tables intentionally have no public RLS policies.
 
-The staging advisor also reports pre-existing public execution grants on `rls_auto_enable()` and disabled leaked-password protection. These were not silently changed. Review them before production security sign-off. Intentional server-only RLS tables have no public policies.
-
-This delivery is tested development code plus deployed login repairs. Full production/auth/browser acceptance is still outstanding; it is not a 100% production-ready claim.
-
-## Itemized quotation update — 10 October 2026
-
-The quotation screen now captures client name/email/phone, an existing or new client, and up to 50 product/service lines with unit price and integer quantity. The browser previews totals; the server calculates and stores subtotal, discount and final total in integer paisa/cents. Client contact and 30%-default advance policy are saved with the quotation.
-
-Sales can create normal quotations and request Owner approval for discounted/below-floor drafts. Approved/sent quotations can generate a private 30-day link, copied or shared through user-operated WhatsApp/email compose links. Token secrets appear only in the URL fragment and request headers; the database stores hashes. New links revoke previous links, and the creating salesman or Owner can disable them.
-
-The shared quotation page shows all items and client details, print/PDF option, verified payments and remaining balance. It offers default advance/custom part payment and full remaining payment, plus a UPI app link for INR quotations. Customers explicitly accept the quotation and submit the bank reference. No customer panel account is required for this specific quotation link. It does not grant access to other client records. The authenticated client portal also displays its own itemized quotations after Owner membership assignment.
-
-Payment review remains manual. Shared-link submissions have no signed-in user ID and are audited as `client_link`; a database constraint still requires an authenticated actor for approval/rejection/reopening. A locked quotation binds acceptance to one matching invoice. Itemized quotation financial data is immutable; revisions require a new quotation.
-
-Validation: 170 Node tests pass. DOM checks exercised a 2 × 15000 + 3 × 1000 = 33000 quotation, client fields, 30% advance, full balance and custom part-payment selection, and safe text rendering. The additive `sql/004_itemized_quotations.sql` schema was applied to isolated staging only. A real PostgreSQL rollback check validated saved line totals, private link expiry and denial of anonymous payment decisions. Full real-browser/Auth acceptance and feature deployment remain outstanding.
-
-## Multiple receiving UPI accounts
-
-Owner policy now supports primary and secondary receiving UPI IDs plus receiver name. The quotation page and signed-in client portal let customers select the account and part/full INR amount. The Pay via UPI link and locally generated QR encode the same selected account and amount; no external QR service receives these details. QR generation accepts only configured receiving accounts, validates amount precision and applies rate limits. Changing recipient/amount does not create or confirm a payment. Existing manual bank review, audit, pending status and client isolation remain required.
-
-Apply `backend/sql/005_multiple_upi_options.sql` before deploying this version. Both customer-provided receiving IDs and receiver name have been configured only in the staging policy; these are runtime Owner settings, not hardcoded in source. Production deployment/configuration and real mobile UPI payment testing remain outstanding.
-
-## Shared company theme
-
-All hosted Owner/staff sign-in, admin workspace, client portal, recovery and quotation/payment pages use the website's final orange/cream palette and original `assets/img/logo-transparent.png`. A shared `/branding/brand.css` stylesheet keeps buttons, forms, cards and navigation consistent. Only the exact logo and stylesheet are publicly served; repository directories are not exposed. Quotation Print / Save PDF retains the logo, company footer and readable print colors, with payment controls excluded from print. Hosted-page script/CSP checks and quotation DOM smoke checks pass. These visual changes are saved on the feature branch and are not yet deployed live.
-
-## Customer payment acknowledgement
-
-After a reference submission, both quotation and client portal show a dedicated acknowledgement with reported amount, transaction reference, total, verified paid amount, remaining balance and clearly labelled expected balance after approval. Pending submissions do not reduce the verified balance. Refreshing status changes the box to Payment confirmed only after backend approval; rejected references show the review reason. Portal sign-out/account switching clears the acknowledgement. Hosted script/CSP and DOM pending-to-approved balance checks pass. This code is saved on the feature branch; live deployment is outstanding.
+This is completed, tested feature code and staging database preparation. It is not a claim of completed live deployment or real-account/mobile acceptance.

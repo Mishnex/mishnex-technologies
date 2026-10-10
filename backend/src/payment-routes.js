@@ -35,6 +35,8 @@ export function paymentRoutes({pool,authorize,requireOwner}) {
    if(p.status==='approved')reject(409,'An approved payment cannot be rejected or reopened.');
    if(d.action==='reopened'&&p.status!=='rejected')reject(409,'Only rejected payments can be reopened.');
    if(d.action==='approved'){
+    await client.query('select pg_advisory_xact_lock(hashtextextended(lower(btrim($1)),918))',[p.reference]);
+    const prior=await client.query('select submission_id from public.crm_invoice_payments where lower(btrim(reference))=lower(btrim($1)) limit 1',[p.reference]);if(prior.rowCount)reject(409,'This bank transaction reference has already been credited. Check the existing receipt.');
     const invoices=await client.query('select id,amount,paid_amount,status from public.crm_invoices where id=$1 for update',[p.invoice_id]);const invoice=invoices.rows[0];
     if(!invoice||!['issued','part_paid'].includes(invoice.status))reject(409,'Invoice must be issued and unpaid.');
     const cents=Math.round(Number(p.amount)*100),due=Math.round(Number(invoice.amount)*100)-Math.round(Number(invoice.paid_amount)*100);

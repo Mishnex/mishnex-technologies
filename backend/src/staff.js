@@ -127,7 +127,7 @@ export function staffRoutes({ pool, requireOwner }) {
       res.set('Cache-Control','no-store').json({
         accessToken:data.access_token, expiresIn:data.expires_in,
         role:account.role, mustChangePassword:account.must_change_password,
-        crmAccessEnabled:false
+        crmAccessEnabled:process.env.STAFF_CRM_ENABLED==='true'&&!account.must_change_password
       });
     } catch (error) { next(error); }
   });
@@ -156,7 +156,7 @@ export function staffRoutes({ pool, requireOwner }) {
       }
       res.set('Cache-Control','no-store').json({
         id:staff.user_id,fullName:staff.full_name,role:staff.role,
-        mustChangePassword:staff.must_change_password,permissions:sharedPermissionsFor(staff),crmAccessEnabled:false
+        mustChangePassword:staff.must_change_password,permissions:sharedPermissionsFor(staff),crmAccessEnabled:process.env.STAFF_CRM_ENABLED==='true'&&!staff.must_change_password
       });
     } catch (error) { next(error); }
   });

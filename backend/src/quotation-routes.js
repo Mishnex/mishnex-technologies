@@ -9,7 +9,7 @@ const hash=token=>createHash('sha256').update(token).digest('hex');
 export function quotationRoutes({pool,authorize}){
  const r=Router();r.use(authorize);r.use((_req,res,next)=>{res.set('Cache-Control','no-store');next()});
  const writable=(req,res,next)=>req.actor.owner||req.actor.permissions.some(p=>['quotations:create','quotations:manage'].includes(p))?next():res.status(403).json({error:'Quotation creation access required.'});
- r.get('/',permit('quotations:read'),async(req,res,next)=>{try{const result=await pool.query('select id,title,client_name,client_email,client_phone,amount,currency,status,requires_approval,approved_by,created_at from public.crm_quotations order by id desc limit 100');res.json({quotations:result.rows})}catch(e){next(e)}});
+ r.get('/',permit('quotations:read'),async(req,res,next)=>{try{const result=await pool.query('select id,title,client_name,client_email,client_phone,amount,currency,status,requires_approval,approved_by,advance_percent,advance_amount,created_at from public.crm_quotations order by id desc limit 100');res.json({quotations:result.rows})}catch(e){next(e)}});
  r.post('/',writable,async(req,res,next)=>{
   const parsed=quotationSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'Check client details, item names, prices and quantities.'});
   try{const d=parsed.data,t=quotationTotals(d);if(t.amount<=0)return res.status(400).json({error:'Quotation total must be greater than zero.'});
