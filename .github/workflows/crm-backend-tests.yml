@@ -30,6 +30,8 @@ jobs:
         with:
           node-version: '22'
       - run: npm install --no-audit --no-fund
-      - run: npm test
-      - name: Check Owner dashboard JavaScript syntax
-        run: node --check ../assets/js/admin.js
+      - name: Complete Module 1 and Module 2 regression batch
+        run: |
+          npm test
+          find src scripts test test-support -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          node --check ../assets/js/admin.js
