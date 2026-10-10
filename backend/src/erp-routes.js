@@ -18,7 +18,7 @@ export function erpRoutes({pool,requireOwner}) {
  };
  function specFor(req,res){const s=specs[req.params.resource];if(!s){res.status(404).json({error:'Unknown module.'});return null}return s}
  router.get('/:resource',async(req,res,next)=>{const s=specFor(req,res);if(!s)return;try{
-  const r=await pool.query('select * from public.'+s.table+' order by id desc limit 100');
+  const sort=req.params.resource==='website'?'updated_at':'id';const r=await pool.query('select * from public.'+s.table+' order by '+sort+' desc limit 100');
   res.json({items:r.rows});
  }catch(e){next(e)}});
  router.post('/:resource',async(req,res,next)=>{const s=specFor(req,res);if(!s)return;
@@ -31,7 +31,7 @@ export function erpRoutes({pool,requireOwner}) {
   try{const r=await pool.query('insert into public.'+s.table+' ('+columns.join(',')+') values ('+params.map((_,i)=>'$'+(i+1)).join(',')+') returning *',params);res.status(201).json({item:r.rows[0]})}
   catch(e){if(['23503','23514','23502','23505','22P02'].includes(e.code))return res.status(400).json({error:'Invalid linked record or field values.'});next(e)}
  });
- router.patch('/:resource/:id',async(req,res,next)=>{const s=specFor(req,res),id=positiveId.safeParse(req.params.id);if(!s)return;if(!id.success)return res.status(400).json({error:'Invalid record ID.'});
+ router.patch('/:resource/:id',async(req,res,next)=>{const s=specFor(req,res),id=positiveId.safeParse(req.params.id);if(!s)return;if(!id.success)return res.status(400).json({error:'Invalid record ID.'});if(req.params.resource==='website')return res.status(405).json({error:'Website content updates require a page and section key.'});
   const schema=z.object(Object.fromEntries(Object.entries(s.fields).map(([key,[,type]])=>[key,type.optional()]))).strict();
   const parsed=schema.safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'Invalid details.'});
   const entries=Object.entries(parsed.data).filter(([,v])=>v!==undefined);
