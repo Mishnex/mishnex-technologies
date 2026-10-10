@@ -24,7 +24,7 @@ async function renderErp(resource){
  projects:[['name','Project name','text',true],['clientId','Client UUID','text'],['description','Description','text'],['status','Status','select:planned,active,on_hold,completed,cancelled'],['dueDate','Due date','date']],
  tasks:[['projectId','Project ID','number',true],['title','Task title','text',true],['assignee','Assignee UUID','text'],['status','Status','select:todo,in_progress,blocked,done'],['dueDate','Due date','date']],
  quotations:[['clientId','Client UUID','text'],['title','Quotation title','text',true],['amount','Amount','number',true],['currency','Currency','select:INR,USD,EUR,GBP'],['status','Status','select:draft,sent,accepted,rejected']],
- invoices:[['clientId','Client UUID','text',true],['quotationId','Quotation ID','number'],['amount','Amount','number',true],['paidAmount','Paid amount','number'],['currency','Currency','select:INR,USD,EUR,GBP'],['dueDate','Due date','date'],['status','Status','select:draft,issued,part_paid,paid,void']],
+ invoices:[['clientId','Client UUID','text',true],['quotationId','Quotation ID','number'],['amount','Amount','number',true],['currency','Currency','select:INR,USD,EUR,GBP'],['dueDate','Due date','date'],['status','Status','select:draft,issued,void']],
  website:[['pageKey','Page key','text',true],['sectionKey','Section key','text',true],['content','Content (JSON object)','textarea',true]]
  };
  const data=await api('/api/admin/erp/'+resource),items=data.items;
