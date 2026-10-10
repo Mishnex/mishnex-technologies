@@ -76,6 +76,14 @@ app.get('/admin-panel', async (_req, res, next) => {
   } catch (error) { next(error); }
 });
 
+app.get('/client-portal', async (_req,res,next)=>{try{
+ const page=await readFile(fileURLToPath(new URL('../public/client-portal.html',import.meta.url)),'utf8');
+ const inlineScript=page.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+ if(!inlineScript)throw Error('Client portal script missing');
+ const scriptHash=createHash('sha256').update(inlineScript).digest('base64');
+ res.set('Content-Security-Policy',`default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'sha256-${scriptHash}'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co; img-src 'self' data:`);
+ res.set('Cache-Control','no-store');res.set('X-Robots-Tag','noindex,nofollow');res.type('html').send(page);
+ }catch(error){next(error)}});
 // Password recovery is hosted on the API domain so it works before the public site deploy.
 app.get('/staff-login', async (_req, res, next) => {
   try {
