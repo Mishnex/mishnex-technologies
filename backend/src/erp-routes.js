@@ -17,6 +17,23 @@ export function erpRoutes({pool,requireOwner}) {
   website:{table:'crm_website_content',fields:{pageKey:['page_key',z.string().regex(/^[a-z0-9_-]{1,80}$/)],sectionKey:['section_key',z.string().regex(/^[a-z0-9_-]{1,80}$/)],content:['content',z.record(z.unknown()).refine(x=>JSON.stringify(x).length<=8000)]}}
  };
  function specFor(req,res){const s=specs[req.params.resource];if(!s){res.status(404).json({error:'Unknown module.'});return null}return s}
+ router.get('/invoices/:id/payments',async(req,res,next)=>{const id=positiveId.safeParse(req.params.id);if(!id.success)return res.status(400).json({error:'Invalid invoice.'});try{
+ const r=await pool.query('select id,invoice_id,amount,reference,note,recorded_at from public.crm_invoice_payments where invoice_id=$1 order by id desc',[id.data]);res.json({payments:r.rows});
+ }catch(e){next(e)}});
+ router.post('/invoices/:id/payments',async(req,res,next)=>{const id=positiveId.safeParse(req.params.id),body=z.object({amount:z.coerce.number().positive().max(9999999999),reference:z.string().trim().min(3).max(120),note:z.string().max(1000).default('')}).strict().safeParse(req.body);
+ if(!id.success||!body.success)return res.status(400).json({error:'Invalid payment details.'});
+ const client=await pool.connect();let committed=false;
+ try{await client.query('BEGIN');
+ const invoice=await client.query('select id,amount,paid_amount,status from public.crm_invoices where id=$1 for update',[id.data]);
+ if(!invoice.rowCount||!['issued','part_paid'].includes(invoice.rows[0].status)){await client.query('ROLLBACK');return res.status(409).json({error:'Invoice must be issued and unpaid.'})}
+ const i=invoice.rows[0],amount=Math.round(body.data.amount*100),due=Math.round((Number(i.amount)-Number(i.paid_amount))*100);
+ if(!Number.isSafeInteger(amount)||amount>due){await client.query('ROLLBACK');return res.status(400).json({error:'Amount exceeds remaining balance.'})}
+ const entry=await client.query('insert into public.crm_invoice_payments(invoice_id,amount,reference,note,recorded_by) values($1,$2,$3,$4,$5) returning id,amount,reference,recorded_at',[id.data,body.data.amount,body.data.reference,body.data.note,req.owner.id]);
+ const nextPaid=(Math.round(Number(i.paid_amount)*100)+amount)/100;
+ await client.query('update public.crm_invoices set paid_amount=$2,status=$3 where id=$1',[id.data,nextPaid,amount===due?'paid':'part_paid']);
+ await client.query('COMMIT');committed=true;res.status(201).json({payment:entry.rows[0],paidAmount:nextPaid});
+ }catch(e){if(!committed){try{await client.query('ROLLBACK')}catch{}}if(e.code==='23505')return res.status(409).json({error:'Payment reference already recorded for this invoice.'});next(e)}finally{client.release(!committed)}
+ });
  router.get('/reports/overview',async(_req,res,next)=>{try{
  const r=await pool.query(`select
  (select count(*)::int from public.crm_leads) leads,
