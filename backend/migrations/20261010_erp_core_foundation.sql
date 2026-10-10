@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS public.crm_projects (
- id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, client_id bigint REFERENCES public.crm_clients(id),
+ id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, client_id uuid REFERENCES public.crm_clients(id),
  name text NOT NULL CHECK(length(name) BETWEEN 2 AND 180), description text NOT NULL DEFAULT '',
  status text NOT NULL DEFAULT 'planned' CHECK(status IN ('planned','active','on_hold','completed','cancelled')),
  due_date date, created_at timestamptz NOT NULL DEFAULT now()
@@ -11,13 +11,13 @@ CREATE TABLE IF NOT EXISTS public.crm_project_tasks (
  due_date date, created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS public.crm_quotations (
- id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, client_id bigint REFERENCES public.crm_clients(id),
+ id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, client_id uuid REFERENCES public.crm_clients(id),
  title text NOT NULL, amount numeric(12,2) NOT NULL CHECK(amount>=0),
  currency char(3) NOT NULL DEFAULT 'INR', status text NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','sent','accepted','rejected')),
  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS public.crm_invoices (
- id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, client_id bigint NOT NULL REFERENCES public.crm_clients(id),
+ id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, client_id uuid NOT NULL REFERENCES public.crm_clients(id),
  quotation_id bigint REFERENCES public.crm_quotations(id), amount numeric(12,2) NOT NULL CHECK(amount>=0),
  paid_amount numeric(12,2) NOT NULL DEFAULT 0 CHECK(paid_amount>=0 AND paid_amount<=amount),
  currency char(3) NOT NULL DEFAULT 'INR', due_date date,
