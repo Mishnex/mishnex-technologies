@@ -27,6 +27,12 @@ export function clientRoutes({pool,requireOwner}) {
       return res.status(400).json({error:'Invalid client conversion request.'});
     }
     let client,transactionOpen=false,commitAttempted=false,broken=false;
+    async function rollbackForResponse(){
+      transactionOpen=false;
+      broken=true;
+      await client.query('ROLLBACK');
+      broken=false;
+    }
     try {
       client=await pool.connect();
       transactionOpen=true;
@@ -35,20 +41,20 @@ export function clientRoutes({pool,requireOwner}) {
         'SELECT id,status,name,email,phone FROM public.crm_leads WHERE id=$1 FOR UPDATE',[leadId.data]
       );
       if(!lead.rowCount){
-        await client.query('ROLLBACK');transactionOpen=false;
+        await rollbackForResponse();
         return res.status(404).json({error:'Lead not found.'});
       }
       const existing=await client.query(
         'SELECT id FROM public.crm_clients WHERE source_lead_id=$1',[leadId.data]
       );
       if(existing.rowCount){
-        await client.query('ROLLBACK');transactionOpen=false;
+        await rollbackForResponse();
         return res.status(409).json({error:'Lead has already been converted to a client.',clientId:existing.rows[0].id});
       }
       let details;
       try{details=clientFromLead(lead.rows[0]);}
       catch(error){
-        await client.query('ROLLBACK');transactionOpen=false;
+        await rollbackForResponse();
         return res.status(422).json({error:error.message});
       }
       const inserted=await client.query(
