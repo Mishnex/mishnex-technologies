@@ -17,7 +17,7 @@ export function staffRoutes({ pool, requireOwner }) {
   const staffSchema = z.object({
     email: z.string().trim().email().max(254).transform(v => v.toLowerCase()),
     fullName: z.string().trim().min(2).max(120),
-    role: z.enum(['super_admin','manager','sales','developer','accountant'])
+    role: z.enum(['super_admin','manager','sales','developer','accountant','hr'])
   }).strict();
   const uuidSchema = z.string().uuid();
   const fingerprint = token => createHash('sha256').update(token).digest('hex');
