@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import pg from 'pg';
 import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { leadSchema } from './validation.js';
 import { staffRoutes } from './staff.js';
@@ -62,6 +63,10 @@ app.post('/api/public/leads', leadLimiter, async (req, res, next) => {
 app.get('/admin-panel', async (_req, res, next) => {
   try {
     const page = await readFile(fileURLToPath(new URL('../public/admin-panel.html', import.meta.url)), 'utf8');
+    const inlineScript = page.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+    if (!inlineScript) throw new Error('Admin panel script is missing');
+    const scriptHash = createHash('sha256').update(inlineScript).digest('base64');
+    res.set('Content-Security-Policy', `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'sha256-${scriptHash}'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; upgrade-insecure-requests`);
     res.set('Cache-Control', 'no-store');
     res.set('X-Robots-Tag', 'noindex, nofollow');
     res.type('html').send(page);
