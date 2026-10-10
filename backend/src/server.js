@@ -12,6 +12,9 @@ import { staffRoutes } from './staff.js';
 import { hrRoutes } from './hr-routes.js';
 import { erpRoutes } from './erp-routes.js';
 import { pageSecurity } from './page-security.js';
+import { policyRoutes } from './policy-routes.js';
+import { workspaceAuth } from './workspace-auth.js';
+import { paymentRoutes } from './payment-routes.js';
 import { portalRoutes } from './portal-routes.js';
 import { leadWorkflowRoutes } from './lead-routes.js';
 import { clientRoutes } from './client-routes.js';
@@ -198,8 +201,10 @@ async function requireOwner(req, res, next) {
 }
 app.use('/api/admin/staff', staffRoutes({ pool, requireOwner }));
 app.use('/api/admin/hr', hrRoutes({ pool, requireOwner }));
-app.use('/api/admin/erp', erpRoutes({ pool, requireOwner }));
+app.use('/api/admin/erp', erpRoutes({ pool, requireOwner, authorize:workspaceAuth(pool) }));
 app.use('/api/client', portalRoutes({ pool }));
+app.use('/api/admin/settings',policyRoutes({pool,requireOwner}));
+app.use('/api/admin/payments', paymentRoutes({pool,authorize:workspaceAuth(pool),requireOwner}));
 app.use('/api/admin/lead-workflow', leadWorkflowRoutes({ pool, requireOwner }));
 app.use('/api/admin/clients', clientRoutes({ pool, requireOwner }));
 app.get('/api/admin/me', requireOwner, (req, res) => {
