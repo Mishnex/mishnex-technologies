@@ -1,0 +1,17 @@
+import {Router} from 'express';
+import {randomBytes} from 'node:crypto';
+import {z} from 'zod';
+import {transaction,reject} from './transaction.js';
+export function clientLoginRoutes({pool}){
+ const r=Router();
+ r.post('/',async(req,res,next)=>{const b=z.object({clientId:z.string().uuid(),email:z.string().trim().email().max(254).transform(x=>x.toLowerCase())}).strict().safeParse(req.body);if(!b.success)return res.status(400).json({error:'Select a client and enter their login email.'});
+  if(!process.env.SUPABASE_URL||!process.env.SUPABASE_SERVICE_ROLE_KEY)return res.status(503).json({error:'Client account creation is not configured.'});
+  let createdId=null;
+  async function provider(path,method,body){const response=await fetch(new URL('/auth/v1/admin/'+path,process.env.SUPABASE_URL),{method,headers:{apikey:process.env.SUPABASE_SERVICE_ROLE_KEY,Authorization:'Bearer '+process.env.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(10000)});if(!response.ok){const error=new Error('Authentication account could not be created. Check for an existing account before retrying.');error.status=response.status===422?409:503;throw error}return response.json().catch(()=>({}))}
+  try{const selected=await pool.query('select id,name,email from public.crm_clients where id=$1',[b.data.clientId]);if(!selected.rowCount)return res.status(404).json({error:'Client not found.'});if(selected.rows[0].email?.trim().toLowerCase()!==b.data.email)return res.status(400).json({error:'Login email must match the selected client email.'});const existing=await pool.query('select id from auth.users where lower(email)=$1',[b.data.email]);let userId=existing.rows[0]?.id,password=null;
+   if(!userId){password=randomBytes(24).toString('base64url')+'aA1!';const created=await provider('users','POST',{email:b.data.email,password,email_confirm:true});userId=created.id||created.user?.id;if(!userId)reject(503,'Auth provider returned no account identity.');createdId=userId;}
+   await transaction(pool,async c=>{if(userId===process.env.OWNER_USER_ID)reject(400,'Owner account cannot be assigned as a client login.');const staff=await c.query('select user_id from public.crm_staff where user_id=$1',[userId]);if(staff.rowCount)reject(400,'Staff accounts cannot be assigned as customer logins.');await c.query('insert into public.crm_client_portal_access(client_id,user_id) values($1,$2) on conflict do nothing',[b.data.clientId,userId]);if(createdId)await c.query("insert into public.crm_client_login_accounts(user_id,created_by,sessions_valid_after) values($1,$2,now()-interval '1 second')",[userId,req.owner.id]);});
+   res.status(createdId?201:200).json({linked:true,email:b.data.email,temporaryPassword:password,mustChangePassword:Boolean(createdId),message:createdId?'Client login created. Copy the temporary password securely; the client must change it at first sign-in.':'Existing login linked. Existing password was not changed.'});
+  }catch(e){if(createdId&&e.status!==503){try{await provider('users/'+encodeURIComponent(createdId),'DELETE')}catch{return res.status(503).json({error:'Account setup failed and cleanup is uncertain. Reconcile the client account before retrying.'})}}if(createdId&&e.status===503)return res.status(503).json({error:'Account setup outcome is uncertain. Check the client and Auth records before retrying.'});if(e.status)return res.status(e.status).json({error:e.message});next(e)}
+ });return r;
+}

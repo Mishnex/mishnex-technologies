@@ -1,26 +1,7 @@
-# Manual staff accounts — implementation status
+# Staff account implementation status
 
-Database migration `crm_staff_accounts_and_audit_foundation` applied to Supabase project `mishnex-crm`.
+Owner-only account provisioning, unique individual credentials, first-login password change, password reset, deactivation/revocation, immutable role permissions and the five active Super Admin account/session caps are implemented. Supabase service-role credentials are used only on the server. Owner gets newly generated temporary credentials once; plaintext passwords are not persisted by the CRM.
 
-## Implemented
-- `public.crm_staff` with role, active flag, password-change requirement and creator.
-- `public.crm_staff_audit` append-only-intended event schema.
-- Transaction-serialized database trigger limiting active Super Admin **accounts** to 5.
-- RLS enabled and direct anon/authenticated table privileges revoked.
+Owner-delegated Super Admins can approve/review payments and control advance terms. Sales, HR and Accountant cannot approve payments; only Owner manages accounts and grants. Shared workspace authentication checks active staff, password-change requirement, session cutoff and registered Super Admin session on each protected request.
 
-## Not implemented yet
-- Owner-authorized server endpoints for creating staff via Supabase Auth Admin API.
-- Authorized Super Admin delegation, role authorization, staff password resets and session revocation.
-- First-login mandatory password change enforcement, account disable, audit write logic.
-- 5 simultaneous Super Admin **sessions** limit (distinct from account limit).
-- Admin UI for staff management.
-
-## Requirements before API activation
-- Configure `SUPABASE_SERVICE_ROLE_KEY` as a **secret Render environment variable**, never commit it, return it to the browser, or put it in frontend assets.
-- Establish a working Owner login before allowing provisioning.
-- Implement API authentication and authorization server-side and use service role only server-side.
-- Enforce session revocation and atomic concurrent session limits before granting staff access.
-- Design safe one-time temporary credential delivery without email; do not persist plaintext passwords.
-- Ensure the backend DB TLS certificate chain is verified (DATABASE_CA_CERT currently unconfirmed).
-
-**Website/main branch untouched.**
+Enabled `/staff-login` routes to the shared staff workspace. The current feature branch is not deployed live. See [ERP_CRM_DELIVERY.md](ERP_CRM_DELIVERY.md) for complete test evidence, staging deployment, real-account acceptance and Owner-approved production gates.

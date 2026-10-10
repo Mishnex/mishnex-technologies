@@ -1,3 +1,4 @@
+import {clientLoginRoutes} from './client-login-routes.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { clientFromLead } from './client-workflow.js';
@@ -13,6 +14,7 @@ export function clientRoutes({pool,requireOwner}) {
     next();
   });
   router.use(requireOwner);
+  router.use('/portal-account',clientLoginRoutes({pool}));
   router.get('/portal-access',async(_req,res,next)=>{try{
     const r=await pool.query('select a.client_id,a.user_id,c.name from public.crm_client_portal_access a join public.crm_clients c on c.id=a.client_id order by a.created_at desc limit 200');
     res.json({access:r.rows});
@@ -33,7 +35,7 @@ export function clientRoutes({pool,requireOwner}) {
   router.get('/',async(req,res,next)=>{
     try {
       const result=await pool.query(
-        'SELECT id,source_lead_id,name,email,phone,created_at FROM public.crm_clients ORDER BY created_at DESC,id DESC LIMIT 100'
+        'SELECT id,client_code,source_lead_id,name,email,phone,created_at FROM public.crm_clients ORDER BY created_at DESC,id DESC LIMIT 100'
       );
       return res.json({clients:result.rows});
     }catch(error){next(error);}

@@ -12,6 +12,14 @@ import { staffRoutes } from './staff.js';
 import { hrRoutes } from './hr-routes.js';
 import { erpRoutes } from './erp-routes.js';
 import { pageSecurity } from './page-security.js';
+import {quotationRoutes} from './quotation-routes.js';
+import {upiRoutes} from './upi-routes.js';
+import {quoteLinkRoutes} from './quote-link-routes.js';
+import {paymentControlRoutes} from './payment-control-routes.js';
+import {employeeActivityRoutes} from './employee-activity-routes.js';
+import { policyRoutes } from './policy-routes.js';
+import { workspaceAuth } from './workspace-auth.js';
+import { paymentRoutes } from './payment-routes.js';
 import { portalRoutes } from './portal-routes.js';
 import { leadWorkflowRoutes } from './lead-routes.js';
 import { clientRoutes } from './client-routes.js';
@@ -40,6 +48,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+// Explicit public brand assets; no broad repository/static directory exposure.
+app.get('/branding/brand.css',(_req,res)=>res.sendFile(fileURLToPath(new URL('../public/brand.css',import.meta.url))));
+app.get('/branding/logo.png',(_req,res)=>res.sendFile(fileURLToPath(new URL('../../assets/img/logo-transparent.png',import.meta.url))));
 const leadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 5,
@@ -88,6 +99,7 @@ app.get('/client-portal', async (_req,res,next)=>{try{
 // Password recovery is hosted on the API domain so it works before the public site deploy.
 app.get('/staff-login', async (_req, res, next) => {
   try {
+    if(process.env.STAFF_CRM_ENABLED==='true')return res.redirect('/admin-panel?account=employee');
     const page = await readFile(fileURLToPath(new URL('../public/staff-login.html', import.meta.url)), 'utf8');
     res.set('Content-Security-Policy',pageSecurity(page,{supabase:false}));
     res.set('X-Robots-Tag','noindex, nofollow');
@@ -132,7 +144,7 @@ app.post('/api/admin/password-recovery', recoveryLimiter, async (req, res, next)
     if (!process.env.OWNER_EMAIL || process.env.OWNER_EMAIL.toLowerCase() !== email.toLowerCase()) {
       return res.json({ message: 'If this is the Owner account, a recovery email will be sent.' });
     }
-    const redirectTo = 'https://mishnex-crm-api.onrender.com/reset-password';
+    const redirectTo = new URL('/reset-password',process.env.RENDER_EXTERNAL_URL || 'https://mishnex-crm-api.onrender.com').href;
     const response = await fetch(new URL('/auth/v1/recover?redirect_to=' + encodeURIComponent(redirectTo), process.env.SUPABASE_URL), {
       method: 'POST', headers: { apikey: process.env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }), signal: AbortSignal.timeout(8000)
@@ -198,13 +210,21 @@ async function requireOwner(req, res, next) {
 }
 app.use('/api/admin/staff', staffRoutes({ pool, requireOwner }));
 app.use('/api/admin/hr', hrRoutes({ pool, requireOwner }));
-app.use('/api/admin/erp', erpRoutes({ pool, requireOwner }));
+app.use('/api/admin/erp', erpRoutes({ pool, requireOwner, authorize:workspaceAuth(pool) }));
 app.use('/api/client', portalRoutes({ pool }));
+app.use('/api/admin/quotations',quotationRoutes({pool,authorize:workspaceAuth(pool)}));
+app.use('/api/public',upiRoutes({pool}));
+app.use('/api/quote-link',quoteLinkRoutes({pool}));
+app.get('/quotation',async(_req,res,next)=>{try{const page=await readFile(fileURLToPath(new URL('../public/quotation.html',import.meta.url)),'utf8');res.set('Content-Security-Policy',pageSecurity(page));res.set('Referrer-Policy','no-referrer');res.set('Cache-Control','no-store');res.set('X-Robots-Tag','noindex,nofollow');res.type('html').send(page)}catch(e){next(e)}});
+app.use('/api/admin/employee-activity',employeeActivityRoutes({pool,authorize:workspaceAuth(pool)}));
+app.use('/api/admin/payment-controls',paymentControlRoutes({pool,authorize:workspaceAuth(pool)}));
+app.use('/api/admin/settings',policyRoutes({pool,requireOwner}));
+app.use('/api/admin/payments', paymentRoutes({pool,authorize:workspaceAuth(pool),requireOwner}));
 app.use('/api/admin/lead-workflow', leadWorkflowRoutes({ pool, requireOwner }));
 app.use('/api/admin/clients', clientRoutes({ pool, requireOwner }));
 app.get('/api/admin/me', requireOwner, (req, res) => {
   res.set('Cache-Control', 'no-store');
-  res.json({ id: req.owner.id, email: req.owner.email, role: 'owner' });
+  res.json({ id: req.owner.id, accountCode: 'MISH-OWN-000001', fullName: req.owner.user_metadata?.full_name || req.owner.user_metadata?.name || 'Owner', email: req.owner.email, role: 'owner' });
 });
 app.get('/api/admin/leads', requireOwner, async (req, res, next) => {
   const rawStatus = req.query.status;

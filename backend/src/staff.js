@@ -88,7 +88,7 @@ export function staffRoutes({ pool, requireOwner }) {
   router.get('/leads', (req,res,next) => requireStaffPermission('leads:read',req,res,next), async (_req,res,next) => {
     try {
       const result = await pool.query(
-        'select id,name,email,service,created_at from public.crm_leads order by created_at desc limit 50'
+        'select id,name,email,phone,service,status,created_at from public.crm_leads order by created_at desc limit 50'
       );
       res.set('Cache-Control','no-store').json({ leads:result.rows });
     } catch(error) { next(error); }
@@ -127,7 +127,7 @@ export function staffRoutes({ pool, requireOwner }) {
       res.set('Cache-Control','no-store').json({
         accessToken:data.access_token, expiresIn:data.expires_in,
         role:account.role, mustChangePassword:account.must_change_password,
-        crmAccessEnabled:false
+        crmAccessEnabled:process.env.STAFF_CRM_ENABLED==='true'&&!account.must_change_password
       });
     } catch (error) { next(error); }
   });
@@ -143,7 +143,7 @@ export function staffRoutes({ pool, requireOwner }) {
       });
       if (!response.ok) return res.status(401).json({ error:'Invalid session.' });
       const user = await response.json();
-      const result = await pool.query('select user_id,full_name,role,is_active,must_change_password,sessions_valid_after from public.crm_staff where user_id=$1',[user.id]);
+      const result = await pool.query('select user_id,employee_code,full_name,role,is_active,must_change_password,sessions_valid_after from public.crm_staff where user_id=$1',[user.id]);
       if (!result.rowCount || !result.rows[0].is_active) return res.status(403).json({ error:'Account disabled or not found.' });
       const staff = result.rows[0];
       if (!tokenIssuedAfterCutoff(match[1],staff.sessions_valid_after)) return res.status(401).json({ error:'Session revoked.' });
@@ -155,8 +155,8 @@ export function staffRoutes({ pool, requireOwner }) {
         if (!active.rowCount) return res.status(401).json({ error:'Super Admin session expired or revoked.' });
       }
       res.set('Cache-Control','no-store').json({
-        id:staff.user_id,fullName:staff.full_name,role:staff.role,
-        mustChangePassword:staff.must_change_password,permissions:sharedPermissionsFor(staff),crmAccessEnabled:false
+        id:staff.user_id,employeeCode:staff.employee_code,fullName:staff.full_name,role:staff.role,
+        mustChangePassword:staff.must_change_password,permissions:sharedPermissionsFor(staff),crmAccessEnabled:process.env.STAFF_CRM_ENABLED==='true'&&!staff.must_change_password
       });
     } catch (error) { next(error); }
   });
@@ -222,7 +222,7 @@ export function staffRoutes({ pool, requireOwner }) {
 
   router.get('/', async (_req, res, next) => {
     try {
-      const result = await pool.query('select user_id,email,full_name,role,is_active,must_change_password,created_at from public.crm_staff order by created_at desc limit 100');
+      const result = await pool.query('select user_id,employee_code,email,full_name,role,is_active,must_change_password,created_at from public.crm_staff order by created_at desc limit 100');
       res.set('Cache-Control','no-store').json({ staff: result.rows });
     } catch (error) { next(error); }
   });
