@@ -4,6 +4,12 @@
 
 Feature implementation is deployed on the isolated Render staging service from `development/erp-payment-workflows`, commit `1968433db0dad6408111f3d741b155dd3b2f4c46`. Deployment `dep-db58b4ng0jfs73b86480` is live. Auto-deploy remains off, the free plan remains unchanged, and staging Auth is confirmed as `svhdqexfcyvqnpxuszim`. The five staff, CRM, lead, client and payment-review feature flags are enabled on staging only. Main and production feature switches are unchanged. Draft PR #2 contains the implementation.
 
+## Readable IDs and workspace update
+
+Staging now includes SQL 010: stored unique client codes CL-000001, employee codes EMP-000001 and quotation codes QT-000001, using database identity allocation and generated columns. Existing UUIDs, relationships and email/password sign-in stay intact. Owner is identified as OWN-000001 for the configured single-Owner account. Header shows name, code and readable role; team/client lists, client account switcher, quotation links and printed PDFs display the corresponding codes. Six digits are a minimum, so large numbers are never truncated. Rollbacks may leave sequence gaps; codes are unique, not gapless.
+
+Owner secure browser sign-in succeeded after corrected credentials; quotation and advance-control pages were inspected. The employee/client interface improvements are live; real employee/client end-to-end acceptance and actual bank transfers remain unverified.
+
 ## Implemented
 
 - Individual staff credentials, Owner-only provisioning/deactivation, first-login password change and live role/session checks. Database caps retain five active Super Admin accounts and five active Super Admin sessions. Enabled staff sign-in leads to the shared role-specific workspace.
@@ -30,7 +36,7 @@ Feature implementation is deployed on the isolated Render staging service from `
 
 - Render Dashboard branch change and deployment are complete. Existing staging credentials and TLS configuration were preserved. Do not merge PR #2 into the base branch without the production release review: the other API service auto-deploys that base and uses production Supabase.
 - Live HTTP checks passed: health, all six hosted pages, logo/CSS and both configured UPI SVG QR endpoints return 200. Unauthenticated payment review and advance controls return 401. Staff-login redirects into the employee workspace. Browser inspection confirms the live client portal logo and orange/cream theme.
-- Owner sign-in was attempted through secure browser authentication. The site returned `Login could not finish: Invalid credentials or access denied.` No Owner dashboard or successful client account assignment is claimed. The supplied client email still requires verified Owner setup.
+- Owner secure browser sign-in succeeded with corrected credentials; dashboard, quotation form and advance controls were inspected. Successful client account assignment is not claimed. The supplied client email still requires verified Owner setup.
 - Authenticated acceptance remains: Owner-created disposable Sales/HR/Accountant/Developer/delegated and non-delegated Super Admin accounts, two distinct clients, quote creation/acceptance, advance controls, denied access, payment submission/re-review and receipt isolation; five parallel Super Admin sign-ins and sixth-session denial.
 - Real mobile UPI handoff and actual bank receipt verification remain required. Opening an app, scanning a QR or submitting a reference is not proof of bank credit. No payment transfer was performed during automated checks.
 

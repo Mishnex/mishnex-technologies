@@ -12,7 +12,7 @@ export function quoteLinkRoutes({pool}){
  r.use((req,res,next)=>{const token=/^Bearer ([A-Za-z0-9_-]{43})$/.exec(req.get('Authorization')||'')?.[1];if(!token)return res.status(404).json({error:'Quotation link is invalid or expired.'});req.quoteHash=quotationTokenHash(token);next()});
  const active="share_token_hash=$1 and share_expires_at>now() and status in ('sent','accepted') and (not requires_approval or approved_by is not null)";
  r.get('/',async(req,res,next)=>{try{
-  const result=await pool.query(`select id,client_id,title,client_name,client_email,client_phone,items,subtotal,discount_percent,discount_amount,amount,currency,advance_percent,advance_amount,notes,status,payment_invoice_id from public.crm_quotations where ${active}`,[req.quoteHash]);
+  const result=await pool.query(`select id,quotation_code,client_id,title,client_name,client_email,client_phone,items,subtotal,discount_percent,discount_amount,amount,currency,advance_percent,advance_amount,notes,status,payment_invoice_id from public.crm_quotations where ${active}`,[req.quoteHash]);
   if(!result.rowCount)return res.status(404).json({error:'Quotation link is invalid or expired.'});const q=result.rows[0];
   const invoice=q.payment_invoice_id?await pool.query('select id,paid_amount,status from public.crm_invoices where id=$1',[q.payment_invoice_id]):await pool.query("select id,paid_amount,status from public.crm_invoices where quotation_id=$1 and client_id=$2 and amount=$3 and currency=$4 and status<>'void' order by id limit 2",[q.id,q.client_id,q.amount,q.currency]);
   const effectiveInvoice=invoice.rows.length===1?invoice.rows[0]:null;

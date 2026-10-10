@@ -35,7 +35,7 @@ export function clientRoutes({pool,requireOwner}) {
   router.get('/',async(req,res,next)=>{
     try {
       const result=await pool.query(
-        'SELECT id,source_lead_id,name,email,phone,created_at FROM public.crm_clients ORDER BY created_at DESC,id DESC LIMIT 100'
+        'SELECT id,client_code,source_lead_id,name,email,phone,created_at FROM public.crm_clients ORDER BY created_at DESC,id DESC LIMIT 100'
       );
       return res.json({clients:result.rows});
     }catch(error){next(error);}

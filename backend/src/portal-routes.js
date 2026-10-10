@@ -34,7 +34,7 @@ export function portalRoutes({pool}) {
  router.post('/change-password',rateLimit({windowMs:15*60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false}),async(req,res,next)=>{const b=z.object({password:z.string().min(12).max(128)}).strict().safeParse(req.body);if(!b.success)return res.status(400).json({error:'Use a password with at least 12 characters.'});try{const response=await fetch(new URL('/auth/v1/user',process.env.SUPABASE_URL),{method:'PUT',headers:{apikey:process.env.SUPABASE_ANON_KEY,Authorization:'Bearer '+req.clientToken,'Content-Type':'application/json'},body:JSON.stringify({password:b.data.password}),signal:AbortSignal.timeout(10000)});if(!response.ok)return res.status(400).json({error:'Password could not be changed. Try again or contact Mishnex.'});await pool.query('update public.crm_client_login_accounts set must_change_password=false,sessions_valid_after=now() where user_id=$1',[req.clientUserId]);res.json({message:'Password updated. Sign in again with your new password.'})}catch(e){next(e)}});
  router.get('/health',(_req,res)=>res.json({status:'ok'}));
  router.get('/overview',async(req,res,next)=>{try{
-  const memberships=await pool.query('select c.id,c.name,c.email from public.crm_client_portal_access a join public.crm_clients c on c.id=a.client_id where a.user_id=$1 order by c.created_at desc',[req.clientUserId]);
+  const memberships=await pool.query('select c.id,c.client_code,c.name,c.email from public.crm_client_portal_access a join public.crm_clients c on c.id=a.client_id where a.user_id=$1 order by c.created_at desc',[req.clientUserId]);
   res.json({clients:memberships.rows});
  }catch(e){next(e)}});
  router.get('/clients/:clientId/projects',async(req,res,next)=>{try{
@@ -49,7 +49,7 @@ export function portalRoutes({pool}) {
  router.get('/payment-config',async(_req,res,next)=>{try{const r=await pool.query('select upi_id,upi_secondary_id,upi_receiver_name,advance_percent from public.crm_business_policy where singleton');res.json({policy:r.rows[0]||{upi_id:'',advance_percent:30}})}catch(e){next(e)}});
  router.get('/clients/:clientId/quotations',async(req,res,next)=>{
   const clientId=z.string().uuid().safeParse(req.params.clientId);if(!clientId.success)return res.status(400).json({error:'Invalid client.'});
-  try{const r=await pool.query(`select q.id,q.title,q.amount,q.currency,q.status,q.advance_percent,coalesce(q.advance_amount,round(q.amount*q.advance_percent/100,2)) as advance_amount,q.items,q.subtotal,q.discount_amount,q.notes,q.client_name,q.client_email,q.client_phone
+  try{const r=await pool.query(`select q.id,q.quotation_code,q.title,q.amount,q.currency,q.status,q.advance_percent,coalesce(q.advance_amount,round(q.amount*q.advance_percent/100,2)) as advance_amount,q.items,q.subtotal,q.discount_amount,q.notes,q.client_name,q.client_email,q.client_phone
    from public.crm_quotations q where q.client_id=$1 and q.status in ('sent','accepted')
    and exists(select 1 from public.crm_client_portal_access a where a.client_id=q.client_id and a.user_id=$2) order by q.id desc limit 100`,[clientId.data,req.clientUserId]);res.json({quotations:r.rows})}catch(e){next(e)}
  });

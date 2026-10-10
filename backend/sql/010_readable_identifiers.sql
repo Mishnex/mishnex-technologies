@@ -1,0 +1,10 @@
+BEGIN;
+ALTER TABLE public.crm_clients ADD COLUMN client_number bigint GENERATED ALWAYS AS IDENTITY;
+ALTER TABLE public.crm_clients ADD COLUMN client_code text GENERATED ALWAYS AS ('CL-' || lpad(client_number::text,greatest(6,length(client_number::text)),'0')) STORED;
+ALTER TABLE public.crm_clients ADD CONSTRAINT crm_clients_client_code_unique UNIQUE (client_code);
+ALTER TABLE public.crm_staff ADD COLUMN employee_number bigint GENERATED ALWAYS AS IDENTITY;
+ALTER TABLE public.crm_staff ADD COLUMN employee_code text GENERATED ALWAYS AS ('EMP-' || lpad(employee_number::text,greatest(6,length(employee_number::text)),'0')) STORED;
+ALTER TABLE public.crm_staff ADD CONSTRAINT crm_staff_employee_code_unique UNIQUE (employee_code);
+ALTER TABLE public.crm_quotations ADD COLUMN quotation_code text GENERATED ALWAYS AS ('QT-' || lpad(id::text,greatest(6,length(id::text)),'0')) STORED;
+ALTER TABLE public.crm_quotations ADD CONSTRAINT crm_quotations_quotation_code_unique UNIQUE (quotation_code);
+COMMIT;

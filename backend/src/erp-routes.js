@@ -52,10 +52,10 @@ export function erpRoutes({pool,requireOwner,authorize}) {
  res.json({item:r.rows[0]});
  }catch(e){next(e)}});
  router.get('/lookups',async(req,res,next)=>{try{
-  const clients=req.actor.owner||req.actor.permissions.some(p=>['quotations:read','projects:manage','payments:read'].includes(p))?await pool.query('select id,name,email,phone from public.crm_clients order by name limit 200'):{rows:[]};
+  const clients=req.actor.owner||req.actor.permissions.some(p=>['quotations:read','projects:manage','payments:read'].includes(p))?await pool.query('select id,client_code,name,email,phone from public.crm_clients order by name limit 200'):{rows:[]};
   const projects=req.actor.owner||req.actor.permissions.includes('projects:read')?await pool.query('select id,name from public.crm_projects'+(req.actor.role==='developer'?' where id in(select project_id from public.crm_project_tasks where assignee=$1)':'')+' order by id desc limit 200',req.actor.role==='developer'?[req.actor.id]:[]):{rows:[]};
   const staff=req.actor.owner||req.actor.permissions.includes('projects:manage')?await pool.query('select user_id,full_name from public.crm_staff where is_active order by full_name limit 200'):{rows:[]};
-  const quotations=req.actor.owner||req.actor.permissions.includes('quotations:read')?await pool.query("select id,title,client_id,amount,currency from public.crm_quotations where status='accepted' order by id desc limit 200"):{rows:[]};
+  const quotations=req.actor.owner||req.actor.permissions.includes('quotations:read')?await pool.query("select id,quotation_code,title,client_id,amount,currency from public.crm_quotations where status='accepted' order by id desc limit 200"):{rows:[]};
   res.json({clients:clients.rows,projects:projects.rows,staff:staff.rows,quotations:quotations.rows});
  }catch(e){next(e)}});
  router.get('/:resource',async(req,res,next)=>{const s=specFor(req,res);if(!s)return;try{
