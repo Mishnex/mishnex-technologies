@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { leadSchema } from './validation.js';
 import { staffRoutes } from './staff.js';
 import { leadWorkflowRoutes } from './lead-routes.js';
+import { clientRoutes } from './client-routes.js';
 import { leadStatusSchema } from './lead-workflow.js';
 
 const { Pool } = pg;
@@ -164,6 +165,7 @@ async function requireOwner(req, res, next) {
 }
 app.use('/api/admin/staff', staffRoutes({ pool, requireOwner }));
 app.use('/api/admin/lead-workflow', leadWorkflowRoutes({ pool, requireOwner }));
+app.use('/api/admin/clients', clientRoutes({ pool, requireOwner }));
 app.get('/api/admin/me', requireOwner, (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({ id: req.owner.id, email: req.owner.email, role: 'owner' });
