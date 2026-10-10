@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { leadSchema } from './validation.js';
 import { staffRoutes } from './staff.js';
 import { hrRoutes } from './hr-routes.js';
+import { erpRoutes } from './erp-routes.js';
 import { leadWorkflowRoutes } from './lead-routes.js';
 import { clientRoutes } from './client-routes.js';
 import { leadStatusSchema } from './lead-workflow.js';
@@ -181,6 +182,7 @@ async function requireOwner(req, res, next) {
 }
 app.use('/api/admin/staff', staffRoutes({ pool, requireOwner }));
 app.use('/api/admin/hr', hrRoutes({ pool, requireOwner }));
+app.use('/api/admin/erp', erpRoutes({ pool, requireOwner }));
 app.use('/api/admin/lead-workflow', leadWorkflowRoutes({ pool, requireOwner }));
 app.use('/api/admin/clients', clientRoutes({ pool, requireOwner }));
 app.get('/api/admin/me', requireOwner, (req, res) => {
