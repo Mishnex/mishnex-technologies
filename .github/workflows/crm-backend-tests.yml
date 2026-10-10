@@ -1,0 +1,37 @@
+name: CRM backend tests
+
+on:
+  push:
+    branches:
+      - development/admin-crm-foundation
+    paths:
+      - 'backend/**'
+      - 'assets/js/admin.js'
+      - '.github/workflows/crm-backend-tests.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'assets/js/admin.js'
+      - '.github/workflows/crm-backend-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Complete Module 1 and Module 2 regression batch
+        run: |
+          npm test
+          find src scripts test test-support -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          node --check ../assets/js/admin.js
