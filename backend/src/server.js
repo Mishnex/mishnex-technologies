@@ -46,6 +46,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+// Explicit public brand assets; no broad repository/static directory exposure.
+app.get('/branding/brand.css',(_req,res)=>res.sendFile(fileURLToPath(new URL('../public/brand.css',import.meta.url))));
+app.get('/branding/logo.png',(_req,res)=>res.sendFile(fileURLToPath(new URL('../../assets/img/logo-transparent.png',import.meta.url))));
 const leadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 5,

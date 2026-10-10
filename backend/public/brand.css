@@ -1,0 +1,22 @@
+/* Shared Mishnex identity, matching the company site's final warm theme. */
+:root{--brand-accent:#ff7a1a;--brand-accent-dark:#a74400;--brand-ink:#20140d;--brand-muted:#735f52;--brand-line:#edcfb8;--brand-bg:#fff8f1;--brand-card:#fffdfb;color-scheme:light}
+html,body{color:var(--brand-ink);font-family:Inter,Arial,system-ui,sans-serif}
+body{background:radial-gradient(circle at 85% 0,#ffe0c5,transparent 40%),linear-gradient(135deg,#fff8f1,#fff1e3);color:var(--brand-ink)}
+.company-identity{display:flex;align-items:center;gap:12px;margin:0 0 22px;color:var(--brand-ink)}
+.company-logo{width:68px;height:54px;object-fit:contain;flex:none;border-radius:10px;background:#fff}
+.company-name{font-size:16px;font-weight:800;letter-spacing:.07em;line-height:1.4}.company-caption{display:block;font-size:12px;font-weight:400;letter-spacing:0;color:var(--brand-muted);margin-top:3px}
+.card,.panel{background:var(--brand-card);border-color:var(--brand-line);box-shadow:0 12px 36px #7c3a0b0b}
+.sidebar{background:linear-gradient(160deg,#fff1e3,#ffe3cc);color:var(--brand-ink);border-right:1px solid var(--brand-line)}
+.sidebar .brand{margin:0 0 25px;color:var(--brand-ink)}.sidebar .company-identity{gap:9px}.sidebar .company-logo{width:52px;height:43px}.sidebar .company-name{font-size:12px}
+.sidebar .nav:hover,.sidebar .nav.active{background:#ffdcc0;color:#662c08}.brand,.brand span{color:var(--brand-accent-dark)}
+.login{background:radial-gradient(circle at 20% 10%,#ffe0c5,transparent 40%),linear-gradient(125deg,#fff8f1,#fff1e3)}
+input,select,textarea{background:#fff;color:var(--brand-ink);border-color:#cfae94;accent-color:var(--brand-accent)}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid #a74400;outline-offset:3px}
+button,.btn,.button{background:linear-gradient(135deg,#ff7a1a,#ff9a4a);color:#3d1d07;border-color:transparent;font-weight:750}
+button:hover,.btn:hover,.button:hover{filter:brightness(.97)}
+button.alt,.btn.alt,.button.alt{background:#fff0e3;color:#873d09}.btn.danger{background:#fff0f0;color:#a32b2b}
+.muted,.empty,th,small{color:var(--brand-muted)}p{color:inherit}td,th{border-bottom-color:#efddce}.pill{background:#fff0e3;color:#873d09}.notice{background:#fff0e3;color:#663309}
+.error{background:#fff0f0;color:#a22525}.balance div{background:#fff0e3}.total{color:#8e3d06}#message{color:var(--brand-ink)}
+a{color:#8e3d06}a.button{color:#3d1d07}.quotation-footer{border-top:1px solid var(--brand-line);margin-top:24px;padding-top:16px;color:var(--brand-muted);font-size:12px}
+@media(max-width:650px){.company-logo{width:56px;height:45px}.company-name{font-size:13px}.sidebar .company-identity{margin-bottom:10px}}
+@media print{html,body{background:#fff!important;color:#20140d!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}.card,.panel{box-shadow:none}.company-identity{break-inside:avoid}.company-logo{width:68px;height:54px}.quotation-footer{color:#735f52}.balance div{background:#fff1e3!important}thead{display:table-header-group}tr,.totals,.balance{break-inside:avoid}a{color:inherit;text-decoration:none}}
