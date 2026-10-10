@@ -13,6 +13,23 @@ export function clientRoutes({pool,requireOwner}) {
     next();
   });
   router.use(requireOwner);
+  router.get('/portal-access',async(_req,res,next)=>{try{
+    const r=await pool.query('select a.client_id,a.user_id,c.name from public.crm_client_portal_access a join public.crm_clients c on c.id=a.client_id order by a.created_at desc limit 200');
+    res.json({access:r.rows});
+  }catch(e){next(e)}});
+  router.post('/portal-access',async(req,res,next)=>{
+    const parsed=z.object({clientId:z.string().uuid(),userId:z.string().uuid()}).strict().safeParse(req.body);
+    if(!parsed.success)return res.status(400).json({error:'Valid client and account IDs required.'});
+    try{
+      const r=await pool.query('insert into public.crm_client_portal_access(client_id,user_id) values($1,$2) on conflict do nothing returning client_id,user_id',[parsed.data.clientId,parsed.data.userId]);
+      res.status(r.rowCount?201:200).json({linked:true});
+    }catch(e){if(e.code==='23503')return res.status(400).json({error:'Client or authenticated user does not exist.'});next(e)}
+  });
+  router.post('/portal-access/revoke',async(req,res,next)=>{
+    const parsed=z.object({clientId:z.string().uuid(),userId:z.string().uuid()}).strict().safeParse(req.body);
+    if(!parsed.success)return res.status(400).json({error:'Valid client and account IDs required.'});
+    try{const r=await pool.query('delete from public.crm_client_portal_access where client_id=$1 and user_id=$2',[parsed.data.clientId,parsed.data.userId]);res.json({revoked:r.rowCount>0})}catch(e){next(e)}
+  });
   router.get('/',async(req,res,next)=>{
     try {
       const result=await pool.query(
