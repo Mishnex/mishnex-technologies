@@ -58,6 +58,16 @@ app.post('/api/public/leads', leadLimiter, async (req, res, next) => {
 });
 
 
+// Owner dashboard is hosted with the API for staging and production parity.
+app.get('/admin-panel', async (_req, res, next) => {
+  try {
+    const page = await readFile(fileURLToPath(new URL('../public/admin-panel.html', import.meta.url)), 'utf8');
+    res.set('Cache-Control', 'no-store');
+    res.set('X-Robots-Tag', 'noindex, nofollow');
+    res.type('html').send(page);
+  } catch (error) { next(error); }
+});
+
 // Password recovery is hosted on the API domain so it works before the public site deploy.
 app.get('/staff-login', async (_req, res, next) => {
   try {
