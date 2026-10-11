@@ -1,6 +1,6 @@
 # Mishnex CRM release status — 11 October 2026
 
-The feature release is deployed to isolated staging. Production remains on its original CRM foundation; it does not contain the ERP/payment/client schema. Main has not changed. This document supersedes earlier estimates and completion claims.
+The CRM/ERP release is deployed to production at https://mishnex-crm-api.onrender.com. PR #2 merged to development/admin-crm-foundation as 0623e22b70875a9416a115e7795ee7084444c9f0; Render deployment dep-db5mv0ng0jfs73bh2qmg is live. Main has not changed. Email delivery and real multi-role/customer Auth acceptance remain unverified; this is a production deployment, not a claim that every external integration has passed acceptance.
 
 ## Delivered
 
@@ -23,7 +23,7 @@ The feature release is deployed to isolated staging. Production remains on its o
 
 ## Evidence
 
-- 282 automated tests pass locally (lead pool and payment review additions). GitHub CI #524 passed on release-hardening commit `01f20b79f813640d84a7d0ee31ba05c8f26acc77`; the embedded-font/release-document commit is checked independently in the linked PR checks.
+- 285 automated tests pass locally (lead pool and payment review additions). GitHub CI #524 passed on release-hardening commit `01f20b79f813640d84a7d0ee31ba05c8f26acc77`; the embedded-font/release-document commit is checked independently in the linked PR checks.
 - Real staging Owner login succeeded. Employee directory opened an existing Sales employee's complete record.
 - Real Owner browser created a disposable two-item quotation: 2 × INR 100 plus 3 × INR 50 = INR 350. Private sharing and Owner fixed INR 100 advance succeeded.
 - Private checkout created one issued invoice without crediting money. Full payment selected INR 350; part payment selected INR 100. A explicitly simulated QA reference produced pending confirmation: reported INR 100, verified paid INR 0, remaining INR 350, expected after approval INR 250.
@@ -33,21 +33,30 @@ The feature release is deployed to isolated staging. Production remains on its o
 - A disposable eight-account real-Auth acceptance setup was created in isolated staging. Automatic approval review rejected executing the acceptance script because new staff/Super Admin access, password changes and test side effects need specific authorization. All six test staff accounts are disabled, all eight Auth logins are banned, and local credentials were removed. Full removal encountered an expired connector approval state; the disabled fixtures remain for explicit approved cleanup. No execution of the rejected test script or workaround is claimed.
 - `/ready` returned HTTP 200 with `status: ready` on the hardening release. Unauthenticated protected endpoints deny access.
 
-## Still required before claiming production launch
+## Remaining external configuration and acceptance
 
 1. Complete real multi-role Auth acceptance: temporary-password change, Sales/HR/Developer/Accountant and delegated/non-delegated Super Admin restrictions, two customer identities and cross-customer isolation, five parallel Super Admin sessions and sixth denial, disable/reset/logout with actual JWTs. Automated and SQL tests cover these policies but do not replace this live acceptance.
 2. Create/link the intended real customer's portal account using the Owner provisioning flow. The supplied `vishalmishravishal5918@gmail.com` has no staging Auth account or client record. Do not link the distinct Owner account `vishlamishravishal5918@gmail.com` as a client.
 3. Verify real mobile UPI handoff and a bank-received payment before approving it. Direct UPI has manual confirmation, not merchant webhooks, card or netbanking processing.
-4. Run the production rollout checklist below. Production rollout is not completed by a staging deploy.
+4. Configure SMTP privately and verify delivery to the company mailbox. Production database/application rollout below is completed; email delivery is still unverified.
 
-## Production rollout
+## Completed production rollout
 
-- Existing production foundation checked read-only: four CRM tables, required staff/session/password functions, zero CRM leads and zero CRM staff. Preserve existing Auth users and server credentials.
-- Review `release-manifest.json`: 21 ordered migration files with SHA-256 hashes. Run `node backend/scripts/release-check.js` from the repo root. It checks integrity and performs no database writes.
-- Take a database backup and record existing production deployment/configuration. Precheck all constraints, duplicate approved bank references if payment tables already exist, Owner identity and Auth recovery redirect allowlist.
-- Apply the manifest migrations once, in order, to the production project; retain migration history. Do not re-run non-idempotent identity/GST migrations. No destructive down migration after accepting real financial data.
-- Configure the already-authorized receiving UPI accounts and receiver name in business policy. Review quotation floors, default advance and GSTIN; GSTIN does not infer tax rates.
-- Release PR #2 to its base branch only after schema/configuration are ready. That base auto-deploys production. Enable `STAFF_MANAGEMENT_ENABLED`, `STAFF_CRM_ENABLED`, `LEAD_WORKFLOW_ENABLED`, `CLIENT_MANAGEMENT_ENABLED`, and `PAYMENT_REVIEW_ENABLED` through a merging environment update that preserves existing secrets/TLS settings.
-- Use `/ready` as the new service health check, verify Owner login and customer checkout/PDF, monitor deployment logs, and perform the acceptance cases above.
-- If rollout fails, disable new feature flags and redeploy the recorded previous commit; preserve additive schema and ledger records for reconciliation.
-- Supabase's leaked-password protection is currently disabled. Review the available plan/configuration before release: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection. Server-only tables intentionally have RLS without public policies/grants.
+- Verified the production foundation and zero rows in all four original CRM tables. Existing Auth accounts and credentials were preserved; no temporary accounts or passwords were created or changed in production.
+- Captured a private logical CRM snapshot in crm_launch_snapshot_20261011: baseline column/constraint/function metadata and four original CRM tables. All snapshot tables have RLS and no public/anon/authenticated privileges. This is an in-database CRM rollback snapshot, not a complete/offsite backup of Supabase Auth or the project.
+- Verified release-manifest.json integrity and applied all 23 ordered migrations once to production project wgvqbxgeezrurvnownsd, retaining Supabase migration history. Production now has 27 private CRM tables; RLS and absent public SELECT privileges verified.
+- Configured primary UPI vishalmishravishal560-1@okhdfcbank, secondary 8235911701@ptyes, receiver VISHAL KUMAR and default 30% advance. Owner/delegated Super Admin can change advance requirements through the panel.
+- Merged environment updates enable all five workspace/client/lead/payment feature flags while preserving existing server secrets and TLS settings. Company enquiry recipient is info@mishnex.com. SMTP credentials have not been supplied by the user or independently verified; delivery remains an external requirement.
+- PR #2 merged after CI #532 and 282 passing automated tests. Production release auto-deployed; previous application commit was 63ac265ddad50e5c2c0117677444e99f5a7c9754. Keep additive schema and financial records if application rollback is ever required.
+- Production smoke checks exposed a missing trusted database CA. Configured the Supabase Root 2021 CA and retained certificate/hostname verification. Production connection-string SSL parameters are removed before pg initialization so they cannot override the explicit trusted TLS configuration.
+- Added nonsecret startup diagnostics for Owner login/account-provisioning/email configuration and feature flags. The logs contain booleans only, never credential values.
+- Security advisors show intentional RLS-without-public-policies notices and the pre-existing leaked-password protection warning. Server-only tables are intentionally inaccessible through the public Data API. Auth hardening guidance: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection.
+
+## Live entry points
+
+- Owner / employee panel: https://mishnex-crm-api.onrender.com/admin-panel
+- Customer portal: https://mishnex-crm-api.onrender.com/client-portal
+- Readiness: https://mishnex-crm-api.onrender.com/ready
+- Configure SMTP privately: https://dashboard.render.com/web/srv-db4dqunlot8c738m48v0/environment
+
+Do not claim real bank confirmation from a submitted reference. Do not claim completed live employee/customer authorization acceptance: the prior temporary-account test execution was rejected by automatic approval review, and no workaround was run. New customer login accounts must be provisioned by the Owner through the reviewed panel flow.

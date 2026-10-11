@@ -1,3 +1,4 @@
+import {databasePoolOptions} from './database-config.js';
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -40,11 +41,7 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(v => v
 if (!process.env.DATABASE_URL || !allowedOrigins.length) {
   throw new Error('DATABASE_URL and ALLOWED_ORIGINS are required');
 }
-const pool = new Pool({
-  connectionTimeoutMillis: 5000,
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true, ...(process.env.DATABASE_CA_CERT ? { ca: process.env.DATABASE_CA_CERT.replace(/\\n/g, '\n') } : {}) } : undefined
-});
+const pool = new Pool(databasePoolOptions());
 const mailer=enquiryMailer(pool);
 app.use(cors({
   origin(origin, cb) {
@@ -259,7 +256,10 @@ app.use((error, _req, res, _next) => {
   res.status(500).json({ error: 'Unable to submit right now. Please try again.' });
 });
 const port = Number(process.env.PORT || 4000);
-const server = app.listen(port, () => console.log(`Mishnex CRM API listening on port ${port}`));
+const server = app.listen(port, () => {
+  console.log(`Mishnex CRM API listening on port ${port}`);
+  console.info(JSON.stringify({event:'launch_configuration',ownerLoginConfigured:authConfigured(),accountProvisioningConfigured:Boolean(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY&&process.env.OWNER_USER_ID),enquiryEmailConfigured:mailer.configured,features:Object.fromEntries(['STAFF_MANAGEMENT_ENABLED','STAFF_CRM_ENABLED','LEAD_WORKFLOW_ENABLED','CLIENT_MANAGEMENT_ENABLED','PAYMENT_REVIEW_ENABLED'].map(key=>[key,process.env[key]==='true']))}));
+});
 function shutdown() {
   if (stopping) return;
   stopping = true;
