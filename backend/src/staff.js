@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { tokenIssuedAfterCutoff } from './staff-session.js';
 import { permissionsFor as sharedPermissionsFor } from './staff-permissions.js';
 import rateLimit from 'express-rate-limit';
+import { loginRateLimits } from './login-rate-limit.js';
 import { z } from 'zod';
 
 // Owner-only management routes and separately gated staff auth/CRM routes share this router.
@@ -39,10 +40,7 @@ export function staffRoutes({ pool, requireOwner }) {
     }
     return data;
   }
-  const staffLoginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-7',
-    legacyHeaders: false, message: { error: 'Too many sign-in attempts. Try again later.' }
-  });
+  const staffLoginLimiter = loginRateLimits();
   const passwordChangeLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-7',
     legacyHeaders: false, message: { error: 'Too many password changes. Try again later.' }

@@ -14,6 +14,13 @@ export function clientRoutes({pool,requireOwner}) {
     next();
   });
   router.use(requireOwner);
+  async function canLinkClientAccount(clientId, userId, req) {
+    if (userId === req.owner?.id || userId === process.env.OWNER_USER_ID) return false;
+    const match = await pool.query(`select 1 from public.crm_clients c join auth.users u on u.id=$2
+      where c.id=$1 and lower(btrim(c.email))=lower(btrim(u.email))
+      and not exists(select 1 from public.crm_staff s where s.user_id=u.id)`, [clientId, userId]);
+    return Boolean(match.rowCount);
+  }
   router.use('/portal-account',clientLoginRoutes({pool}));
   router.get('/portal-access',async(_req,res,next)=>{try{
     const r=await pool.query('select a.client_id,a.user_id,c.name from public.crm_client_portal_access a join public.crm_clients c on c.id=a.client_id order by a.created_at desc limit 200');
@@ -23,6 +30,7 @@ export function clientRoutes({pool,requireOwner}) {
     const parsed=z.object({clientId:z.string().uuid(),userId:z.string().uuid()}).strict().safeParse(req.body);
     if(!parsed.success)return res.status(400).json({error:'Valid client and account IDs required.'});
     try{
+      if (!await canLinkClientAccount(parsed.data.clientId,parsed.data.userId,req)) return res.status(400).json({error:'Use the matching customer email account. Owner and employee accounts cannot be linked as clients.'});
       const r=await pool.query('insert into public.crm_client_portal_access(client_id,user_id) values($1,$2) on conflict do nothing returning client_id,user_id',[parsed.data.clientId,parsed.data.userId]);
       res.status(r.rowCount?201:200).json({linked:true});
     }catch(e){if(e.code==='23503')return res.status(400).json({error:'Client or authenticated user does not exist.'});next(e)}
@@ -41,7 +49,7 @@ export function clientRoutes({pool,requireOwner}) {
     }catch(error){next(error);}
   });
   router.get('/:clientId/portal-users',async(req,res,next)=>{const id=z.string().uuid().safeParse(req.params.clientId);if(!id.success)return res.status(400).json({error:'Invalid client ID.'});try{const r=await pool.query('select user_id,created_at from public.crm_client_portal_access where client_id=$1 order by created_at desc',[id.data]);res.json({users:r.rows})}catch(e){next(e)}});
-  router.post('/:clientId/portal-users',async(req,res,next)=>{const id=z.string().uuid().safeParse(req.params.clientId),body=z.object({userId:z.string().uuid()}).strict().safeParse(req.body);if(!id.success||!body.success)return res.status(400).json({error:'Invalid client or user ID.'});try{const r=await pool.query('insert into public.crm_client_portal_access(client_id,user_id) values($1,$2) on conflict do nothing returning user_id',[id.data,body.data.userId]);res.status(r.rowCount?201:200).json({linked:true})}catch(e){if(e.code==='23503')return res.status(404).json({error:'Client or authentication user not found.'});next(e)}});
+  router.post('/:clientId/portal-users',async(req,res,next)=>{const id=z.string().uuid().safeParse(req.params.clientId),body=z.object({userId:z.string().uuid()}).strict().safeParse(req.body);if(!id.success||!body.success)return res.status(400).json({error:'Invalid client or user ID.'});try{if(!await canLinkClientAccount(id.data,body.data.userId,req))return res.status(400).json({error:'Use the matching customer email account. Owner and employee accounts cannot be linked as clients.'});const r=await pool.query('insert into public.crm_client_portal_access(client_id,user_id) values($1,$2) on conflict do nothing returning user_id',[id.data,body.data.userId]);res.status(r.rowCount?201:200).json({linked:true})}catch(e){if(e.code==='23503')return res.status(404).json({error:'Client or authentication user not found.'});next(e)}});
   router.delete('/:clientId/portal-users/:userId',async(req,res,next)=>{const id=z.string().uuid().safeParse(req.params.clientId),user=z.string().uuid().safeParse(req.params.userId);if(!id.success||!user.success)return res.status(400).json({error:'Invalid client or user ID.'});try{await pool.query('delete from public.crm_client_portal_access where client_id=$1 and user_id=$2',[id.data,user.data]);res.json({revoked:true})}catch(e){next(e)}});
   router.post('/from-lead/:leadId',async(req,res,next)=>{
     const leadId=z.string().uuid().safeParse(req.params.leadId);

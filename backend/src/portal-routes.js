@@ -5,12 +5,13 @@ import {advanceRequired} from './advance-policy.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
+import { loginRateLimits } from './login-rate-limit.js';
 import { transaction, reject } from './transaction.js';
 import { paymentAmount } from './payment-routes.js';
 export function portalRoutes({pool}) {
  const router=Router();
  router.use((_req,res,next)=>{res.set('Cache-Control','no-store');next()});
- router.post('/login',rateLimit({windowMs:15*60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false}),async(req,res,next)=>{const {email,password}=req.body||{};if(typeof email!=='string'||typeof password!=='string'||email.length>254||password.length>1024||!email||!password)return res.status(400).json({error:'Enter a valid email and password.'});try{
+ router.post('/login',loginRateLimits(),async(req,res,next)=>{const {email,password}=req.body||{};if(typeof email!=='string'||typeof password!=='string'||email.length>254||password.length>1024||!email||!password)return res.status(400).json({error:'Enter a valid email and password.'});try{
  const auth=await fetch(new URL('/auth/v1/token?grant_type=password',process.env.SUPABASE_URL),{method:'POST',headers:{apikey:process.env.SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password}),signal:AbortSignal.timeout(8000)});
  if(!auth.ok)return res.status(401).json({error:'Invalid credentials or client access denied.'});
  const session=await auth.json();

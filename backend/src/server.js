@@ -26,6 +26,7 @@ import { portalRoutes } from './portal-routes.js';
 import { leadWorkflowRoutes } from './lead-routes.js';
 import { clientRoutes } from './client-routes.js';
 import { leadStatusSchema } from './lead-workflow.js';
+import { readinessHandler } from './readiness.js';
 
 const { Pool } = pg;
 const app = express();
@@ -38,6 +39,7 @@ if (!process.env.DATABASE_URL || !allowedOrigins.length) {
   throw new Error('DATABASE_URL and ALLOWED_ORIGINS are required');
 }
 const pool = new Pool({
+  connectionTimeoutMillis: 5000,
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true, ...(process.env.DATABASE_CA_CERT ? { ca: process.env.DATABASE_CA_CERT.replace(/\\n/g, '\n') } : {}) } : undefined
 });
@@ -50,6 +52,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+let stopping = false;
+app.get('/ready', readinessHandler(pool, () => stopping));
 // Explicit public brand assets; no broad repository/static directory exposure.
 app.get('/branding/brand.css',(_req,res)=>res.sendFile(fileURLToPath(new URL('../public/brand.css',import.meta.url))));
 app.get('/branding/logo.png',(_req,res)=>res.sendFile(fileURLToPath(new URL('../../assets/img/logo-transparent.png',import.meta.url))));
@@ -251,4 +255,16 @@ app.use((error, _req, res, _next) => {
   res.status(500).json({ error: 'Unable to submit right now. Please try again.' });
 });
 const port = Number(process.env.PORT || 4000);
-app.listen(port, () => console.log(`Mishnex CRM API listening on port ${port}`));
+const server = app.listen(port, () => console.log(`Mishnex CRM API listening on port ${port}`));
+function shutdown() {
+  if (stopping) return;
+  stopping = true;
+  const deadline = setTimeout(() => process.exit(1), 25000);
+  deadline.unref();
+  server.close(async () => {
+    try { await pool.end(); clearTimeout(deadline); process.exit(0); }
+    catch { process.exit(1); }
+  });
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
