@@ -121,6 +121,11 @@
       "order": 22,
       "path": "supabase/migrations/20261011104059_lead_assignment_payment_audit.sql",
       "sha256": "b74708459ba8b7cf03821594426907234b1f02cba26ac94050140e9f097f4183"
+    },
+    {
+      "order": 23,
+      "path": "supabase/migrations/20261011110012_manual_lead_locations.sql",
+      "sha256": "9c32cc9bab006ba360afda38fa5c0fb99b9b841435514fe1c6e7641336059874"
     }
   ]
 }
