@@ -36,5 +36,6 @@ jobs:
       - name: Complete CRM regression checks
         run: |
           npm test
+          node scripts/release-check.js
           find src scripts test test-support -type f -name '*.js' -print0 | xargs -0 -n1 node --check
           node --check ../assets/js/admin.js
