@@ -1,3 +1,4 @@
+import {invoiceSelect,sendInvoicePDF} from './invoice-document.js';
 import {tokenIssuedAfterCutoff} from './staff-session.js';
 import {quotationInvoice} from './quotation-invoice.js';
 import {advanceRequired} from './advance-policy.js';
@@ -32,6 +33,7 @@ export function portalRoutes({pool}) {
   }catch(e){next(e)}
  });
  router.post('/change-password',rateLimit({windowMs:15*60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false}),async(req,res,next)=>{const b=z.object({password:z.string().min(12).max(128)}).strict().safeParse(req.body);if(!b.success)return res.status(400).json({error:'Use a password with at least 12 characters.'});try{const response=await fetch(new URL('/auth/v1/user',process.env.SUPABASE_URL),{method:'PUT',headers:{apikey:process.env.SUPABASE_ANON_KEY,Authorization:'Bearer '+req.clientToken,'Content-Type':'application/json'},body:JSON.stringify({password:b.data.password}),signal:AbortSignal.timeout(10000)});if(!response.ok)return res.status(400).json({error:'Password could not be changed. Try again or contact Mishnex.'});await pool.query('update public.crm_client_login_accounts set must_change_password=false,sessions_valid_after=now() where user_id=$1',[req.clientUserId]);res.json({message:'Password updated. Sign in again with your new password.'})}catch(e){next(e)}});
+ router.get('/invoices/:id/pdf',async(req,res,next)=>{const id=z.coerce.number().int().positive().safeParse(req.params.id);if(!id.success)return res.status(400).json({error:'Invalid invoice.'});try{const invoice=(await pool.query(invoiceSelect+"where i.id=$1 and i.status<>'draft' and exists(select 1 from public.crm_client_portal_access a where a.client_id=i.client_id and a.user_id=$2)",[id.data,req.clientUserId])).rows[0];if(!invoice)return res.status(404).json({error:'Invoice not found.'});await sendInvoicePDF(res,invoice)}catch(e){next(e)}});
  router.get('/health',(_req,res)=>res.json({status:'ok'}));
  router.get('/overview',async(req,res,next)=>{try{
   const memberships=await pool.query('select c.id,c.client_code,c.name,c.email from public.crm_client_portal_access a join public.crm_clients c on c.id=a.client_id where a.user_id=$1 order by c.created_at desc',[req.clientUserId]);

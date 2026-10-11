@@ -1,0 +1,10 @@
+BEGIN;
+CREATE INDEX crm_directory_lead_actor ON public.crm_lead_activity(actor_id,lead_id);
+CREATE INDEX crm_directory_quote_actor ON public.crm_quotations(created_by,id DESC);
+CREATE INDEX crm_directory_quote_client ON public.crm_quotations(client_id,id DESC);
+CREATE INDEX crm_directory_invoice_client ON public.crm_invoices(client_id,id DESC);
+CREATE INDEX crm_directory_invoice_quote ON public.crm_invoices(quotation_id,id DESC);
+CREATE INDEX crm_directory_project_client ON public.crm_projects(client_id,id DESC);
+CREATE INDEX crm_directory_task_assignee ON public.crm_project_tasks(assignee,id DESC);
+CREATE INDEX crm_directory_task_project ON public.crm_project_tasks(project_id,id DESC);
+COMMIT;

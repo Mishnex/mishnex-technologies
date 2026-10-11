@@ -1,3 +1,4 @@
+import {gstNumber} from './record-directory-routes.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import {transaction,reject} from './transaction.js';
@@ -25,7 +26,7 @@ export function erpRoutes({pool,requireOwner,authorize}) {
   projects:{table:'crm_projects',fields:{clientId:['client_id',uuid],name:['name',z.string().trim().min(2).max(180)],description:['description',z.string().max(3000)],status:['status',z.enum(['planned','active','on_hold','completed','cancelled'])],dueDate:['due_date',date]}},
   tasks:{table:'crm_project_tasks',fields:{projectId:['project_id',positiveId],title:['title',z.string().trim().min(2).max(180)],assignee:['assignee',uuid],status:['status',z.enum(['todo','in_progress','blocked','done'])],dueDate:['due_date',date]}},
   quotations:{table:'crm_quotations',fields:{clientId:['client_id',uuid],title:['title',z.string().trim().min(2).max(180)],discountPercent:['discount_percent',z.coerce.number().min(0).max(100)],amount:['amount',z.coerce.number().min(0).max(9999999999)],currency:['currency',z.enum(['INR','USD','EUR','GBP'])],status:['status',z.enum(['draft','sent','accepted','rejected'])]}},
-  invoices:{table:'crm_invoices',fields:{clientId:['client_id',z.string().uuid()],quotationId:['quotation_id',positiveId.nullable().optional()],amount:['amount',z.coerce.number().min(0).max(9999999999)],paidAmount:['paid_amount',z.coerce.number().min(0).max(9999999999)],currency:['currency',z.enum(['INR','USD','EUR','GBP'])],dueDate:['due_date',date],status:['status',z.enum(['draft','issued','part_paid','paid','void'])]}},
+  invoices:{table:'crm_invoices',fields:{clientGstNumber:['client_gst_number',gstNumber],sellerGstNumber:['seller_gst_number',gstNumber],clientId:['client_id',z.string().uuid()],quotationId:['quotation_id',positiveId.nullable().optional()],amount:['amount',z.coerce.number().min(0).max(9999999999)],paidAmount:['paid_amount',z.coerce.number().min(0).max(9999999999)],currency:['currency',z.enum(['INR','USD','EUR','GBP'])],dueDate:['due_date',date],status:['status',z.enum(['draft','issued','part_paid','paid','void'])]}},
   website:{table:'crm_website_content',fields:{pageKey:['page_key',z.string().regex(/^[a-z0-9_-]{1,80}$/)],sectionKey:['section_key',z.string().regex(/^[a-z0-9_-]{1,80}$/)],content:['content',z.record(z.unknown()).refine(x=>JSON.stringify(x).length<=8000)]}}
  };
  function specFor(req,res){const s=specs[req.params.resource];if(!s){res.status(404).json({error:'Unknown module.'});return null}return s}
@@ -63,7 +64,8 @@ export function erpRoutes({pool,requireOwner,authorize}) {
   const sort=req.params.resource==='website'?'updated_at':'id';
   const scoped=req.actor.role==='developer'&&['projects','tasks'].includes(req.params.resource);
   const where=scoped?(req.params.resource==='tasks'?' where assignee=$1':' where id in(select project_id from public.crm_project_tasks where assignee=$1)'):'';
-  const r=await pool.query('select * from public.'+s.table+where+' order by '+sort+' desc limit 100',scoped?[req.actor.id]:[]);
+  const selected=req.params.resource==='invoices'&&!req.actor.owner&&req.actor.role!=='super_admin'?'id,client_id,quotation_id,amount,paid_amount,currency,due_date,status,created_at,client_gst_number,seller_gst_number':'*';
+  const r=await pool.query('select '+selected+' from public.'+s.table+where+' order by '+sort+' desc limit 100',scoped?[req.actor.id]:[]);
   res.json({items:r.rows});
  }catch(e){next(e)}});
  router.post('/:resource',async(req,res,next)=>{const s=specFor(req,res);if(!s)return;
@@ -75,7 +77,7 @@ export function erpRoutes({pool,requireOwner,authorize}) {
   const entries=Object.entries(parsed.data).filter(([,v])=>v!==undefined);
   if(req.params.resource==='invoices'&&('paidAmount' in parsed.data||parsed.data.status==='paid'||parsed.data.status==='part_paid'))return res.status(400).json({error:'Use a verified payment workflow to record payments.'});
   if(req.params.resource==='invoices'&&parsed.data.paidAmount!==undefined&&parsed.data.amount!==undefined&&parsed.data.paidAmount>parsed.data.amount)return res.status(400).json({error:'Paid amount exceeds invoice amount.'});
-  const columns=entries.map(([key])=>s.fields[key][0]),params=entries.map(([,v])=>v);
+  const columns=entries.map(([key])=>s.fields[key][0]),params=entries.map(([k,v])=>['clientGstNumber','sellerGstNumber'].includes(k)&&v===''?null:v);
   try{
    if(req.params.resource==='quotations'){
     if(!parsed.data.clientId)return res.status(400).json({error:'Select a client for the quotation.'});
@@ -99,7 +101,7 @@ export function erpRoutes({pool,requireOwner,authorize}) {
   const entries=Object.entries(parsed.data).filter(([,v])=>v!==undefined);
   if(!entries.length)return res.status(400).json({error:'No changes.'});
   if(req.params.resource==='invoices'&&('paidAmount' in parsed.data||parsed.data.status==='paid'||parsed.data.status==='part_paid'))return res.status(400).json({error:'Payment amounts and paid status require a verified payment workflow.'});
-  const columns=entries.map(([key])=>s.fields[key][0]),params=entries.map(([,v])=>v);
+  const columns=entries.map(([key])=>s.fields[key][0]),params=entries.map(([k,v])=>['clientGstNumber','sellerGstNumber'].includes(k)&&v===''?null:v);
   try{
    if(req.params.resource==='quotations'){
     const current=await pool.query('select items,share_token_hash,payment_invoice_id from public.crm_quotations where id=$1',[id.data]);
@@ -110,7 +112,7 @@ export function erpRoutes({pool,requireOwner,authorize}) {
     const item=await transaction(pool,async client=>{
      const current=await client.query('select status,paid_amount from public.crm_invoices where id=$1 for update',[id.data]);
      if(!current.rowCount)reject(404,'Invoice not found.');const invoice=current.rows[0];
-     if(invoice.status!=='draft'&&['clientId','quotationId','amount','currency'].some(k=>k in parsed.data))reject(409,'Issued invoice financial details are immutable.');
+     if(invoice.status!=='draft'&&['clientId','quotationId','amount','currency','clientGstNumber','sellerGstNumber'].some(k=>k in parsed.data))reject(409,'Issued invoice financial details are immutable.');
      if(parsed.data.status&&parsed.data.status!==invoice.status){
       const allowed=invoice.status==='draft'?['issued','void']:invoice.status==='issued'&&Number(invoice.paid_amount)===0?['void']:[];
       if(!allowed.includes(parsed.data.status))reject(409,'Invoice status change is not allowed. Paid status is managed by payment review.');
