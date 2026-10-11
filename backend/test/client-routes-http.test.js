@@ -95,3 +95,27 @@ test('client list returns Owner-only records',async()=>{
   assert.equal(r.status,200);assert.deepEqual(r.json.clients,[{id:'client'}]);
   assert.equal(r.calls.length,1);
 });
+
+for(const path of ['/portal-access','/'+leadId+'/portal-users']) {
+  test('legacy portal linking rejects Owner account: '+path,async()=>{
+    const body=path==='/portal-access'?{clientId:leadId,userId:ownerId}:{userId:ownerId};
+    const r=await run({path,body,queries:()=>{throw Error('must not query');}});
+    assert.equal(r.status,400);assert.equal(r.calls.length,0);
+  });
+  test('legacy portal linking checks matching non-staff identity: '+path,async()=>{
+    const userId='7fefcd29-c2c9-49c4-a15a-4e36a20f3db2';
+    const body=path==='/portal-access'?{clientId:leadId,userId}:{userId};
+    const r=await run({path,body,queries:sql=>{
+      assert.match(sql,/lower\(btrim\(c.email\)\)/);
+      assert.match(sql,/not exists\(select 1 from public.crm_staff/);
+      return {rowCount:0,rows:[]};
+    }});
+    assert.equal(r.status,400);assert.equal(r.calls.length,1);
+  });
+  test('legacy portal linking accepts a matching customer identity: '+path,async()=>{
+    const userId='7fefcd29-c2c9-49c4-a15a-4e36a20f3db2';
+    const body=path==='/portal-access'?{clientId:leadId,userId}:{userId};
+    const r=await run({path,body,queries:()=>({rowCount:1,rows:[{user_id:userId}]})});
+    assert.equal(r.status,201);assert.equal(r.calls.length,2);
+  });
+}

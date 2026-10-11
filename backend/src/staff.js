@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { tokenIssuedAfterCutoff } from './staff-session.js';
 import { permissionsFor as sharedPermissionsFor } from './staff-permissions.js';
 import rateLimit from 'express-rate-limit';
+import { loginRateLimits } from './login-rate-limit.js';
 import { z } from 'zod';
 
 // Owner-only management routes and separately gated staff auth/CRM routes share this router.
@@ -39,10 +40,7 @@ export function staffRoutes({ pool, requireOwner }) {
     }
     return data;
   }
-  const staffLoginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-7',
-    legacyHeaders: false, message: { error: 'Too many sign-in attempts. Try again later.' }
-  });
+  const staffLoginLimiter = loginRateLimits();
   const passwordChangeLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-7',
     legacyHeaders: false, message: { error: 'Too many password changes. Try again later.' }
@@ -85,10 +83,10 @@ export function staffRoutes({ pool, requireOwner }) {
   });
   // A safe, read-only overview for staff with explicit lead read permission.
   // Owner-only lead management endpoints remain unchanged.
-  router.get('/leads', (req,res,next) => requireStaffPermission('leads:read',req,res,next), async (_req,res,next) => {
+  router.get('/leads', (req,res,next) => requireStaffPermission('leads:read',req,res,next), async (req,res,next) => {
     try {
       const result = await pool.query(
-        'select id,name,email,service,created_at from public.crm_leads order by created_at desc limit 50'
+        'select l.id,l.name,l.email,l.phone,l.location,l.service,l.status,l.created_at from public.crm_leads l join public.crm_lead_assignments a on a.lead_id=l.id where a.actor_id=$1 and a.closed_at is null order by l.created_at desc limit 50',[req.staff.id]
       );
       res.set('Cache-Control','no-store').json({ leads:result.rows });
     } catch(error) { next(error); }
@@ -127,7 +125,7 @@ export function staffRoutes({ pool, requireOwner }) {
       res.set('Cache-Control','no-store').json({
         accessToken:data.access_token, expiresIn:data.expires_in,
         role:account.role, mustChangePassword:account.must_change_password,
-        crmAccessEnabled:false
+        crmAccessEnabled:process.env.STAFF_CRM_ENABLED==='true'&&!account.must_change_password
       });
     } catch (error) { next(error); }
   });
@@ -143,7 +141,7 @@ export function staffRoutes({ pool, requireOwner }) {
       });
       if (!response.ok) return res.status(401).json({ error:'Invalid session.' });
       const user = await response.json();
-      const result = await pool.query('select user_id,full_name,role,is_active,must_change_password,sessions_valid_after from public.crm_staff where user_id=$1',[user.id]);
+      const result = await pool.query('select user_id,employee_code,full_name,role,is_active,must_change_password,sessions_valid_after from public.crm_staff where user_id=$1',[user.id]);
       if (!result.rowCount || !result.rows[0].is_active) return res.status(403).json({ error:'Account disabled or not found.' });
       const staff = result.rows[0];
       if (!tokenIssuedAfterCutoff(match[1],staff.sessions_valid_after)) return res.status(401).json({ error:'Session revoked.' });
@@ -155,8 +153,8 @@ export function staffRoutes({ pool, requireOwner }) {
         if (!active.rowCount) return res.status(401).json({ error:'Super Admin session expired or revoked.' });
       }
       res.set('Cache-Control','no-store').json({
-        id:staff.user_id,fullName:staff.full_name,role:staff.role,
-        mustChangePassword:staff.must_change_password,permissions:sharedPermissionsFor(staff),crmAccessEnabled:false
+        id:staff.user_id,employeeCode:staff.employee_code,fullName:staff.full_name,role:staff.role,
+        mustChangePassword:staff.must_change_password,permissions:sharedPermissionsFor(staff),crmAccessEnabled:process.env.STAFF_CRM_ENABLED==='true'&&!staff.must_change_password
       });
     } catch (error) { next(error); }
   });
@@ -222,7 +220,7 @@ export function staffRoutes({ pool, requireOwner }) {
 
   router.get('/', async (_req, res, next) => {
     try {
-      const result = await pool.query('select user_id,email,full_name,role,is_active,must_change_password,created_at from public.crm_staff order by created_at desc limit 100');
+      const result = await pool.query('select user_id,employee_code,email,full_name,role,is_active,must_change_password,created_at from public.crm_staff order by created_at desc limit 100');
       res.set('Cache-Control','no-store').json({ staff: result.rows });
     } catch (error) { next(error); }
   });

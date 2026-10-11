@@ -1,32 +1,12 @@
+import {workspaceAuth} from './workspace-auth.js';
 import { Router } from 'express';
-import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { permissionsFor } from './staff-permissions.js';
-import { tokenIssuedAfterCutoff } from './staff-session.js';
 
 export function hrRoutes({pool,requireOwner}) {
  const router=Router();
  router.use((_req,res,next)=>{res.set('Cache-Control','no-store');next()});
- async function authorize(req,res,next) {
-  const bearer=/^Bearer (\S+)$/.exec(req.get('Authorization')||'');
-  if(!bearer)return res.status(401).json({error:'Sign in required.'});
-  try {
-   const auth=await fetch(new URL('/auth/v1/user',process.env.SUPABASE_URL),{headers:{apikey:process.env.SUPABASE_ANON_KEY,Authorization:'Bearer '+bearer[1]},signal:AbortSignal.timeout(8000)});
-   if(!auth.ok)return res.status(401).json({error:'Invalid session.'});
-   const user=await auth.json();
-   if(user.id===process.env.OWNER_USER_ID){req.hrActor={id:user.id,owner:true};return next()}
-   const result=await pool.query('select user_id,role,is_active,must_change_password,sessions_valid_after from public.crm_staff where user_id=$1',[user.id]);
-   const staff=result.rows[0];
-   if(!staff?.is_active||staff.must_change_password||!tokenIssuedAfterCutoff(bearer[1],staff.sessions_valid_after))return res.status(403).json({error:'Staff access denied.'});
-   if(staff.role==='super_admin'){
-    const fingerprint=createHash('sha256').update(bearer[1]).digest('hex');
-    const active=await pool.query('select 1 from public.crm_super_admin_sessions where user_id=$1 and token_fingerprint=$2 and revoked_at is null and expires_at>now()',[user.id,fingerprint]);
-    if(!active.rowCount)return res.status(401).json({error:'Super Admin session revoked.'});
-   }
-   req.hrActor={id:user.id,owner:false,permissions:permissionsFor(staff)};
-   next();
-  }catch(error){next(error)}
- }
+ const authenticate=workspaceAuth(pool);
+ function authorize(req,res,next){authenticate(req,res,error=>{if(error)return next(error);req.hrActor=req.actor;next()})}
  function permit(permission){return (req,res,next)=>req.hrActor.owner||req.hrActor.permissions.includes(permission)?next():res.status(403).json({error:'Insufficient permissions.'})}
  const uuid=z.string().uuid();
  const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/);

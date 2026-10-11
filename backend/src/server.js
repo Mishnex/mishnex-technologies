@@ -12,10 +12,23 @@ import { staffRoutes } from './staff.js';
 import { hrRoutes } from './hr-routes.js';
 import { erpRoutes } from './erp-routes.js';
 import { pageSecurity } from './page-security.js';
+import {quotationRoutes} from './quotation-routes.js';
+import {upiRoutes} from './upi-routes.js';
+import {quoteLinkRoutes} from './quote-link-routes.js';
+import {paymentControlRoutes} from './payment-control-routes.js';
+import {recordDirectoryRoutes} from './record-directory-routes.js';
+import {invoiceRoutes} from './invoice-routes.js';
+import {employeeActivityRoutes} from './employee-activity-routes.js';
+import { policyRoutes } from './policy-routes.js';
+import { workspaceAuth } from './workspace-auth.js';
+import {enquiryMailer} from './enquiry-mail.js';
+import {leadPoolRoutes} from './lead-pool-routes.js';
+import { paymentRoutes } from './payment-routes.js';
 import { portalRoutes } from './portal-routes.js';
 import { leadWorkflowRoutes } from './lead-routes.js';
 import { clientRoutes } from './client-routes.js';
 import { leadStatusSchema } from './lead-workflow.js';
+import { readinessHandler } from './readiness.js';
 
 const { Pool } = pg;
 const app = express();
@@ -28,9 +41,11 @@ if (!process.env.DATABASE_URL || !allowedOrigins.length) {
   throw new Error('DATABASE_URL and ALLOWED_ORIGINS are required');
 }
 const pool = new Pool({
+  connectionTimeoutMillis: 5000,
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true, ...(process.env.DATABASE_CA_CERT ? { ca: process.env.DATABASE_CA_CERT.replace(/\\n/g, '\n') } : {}) } : undefined
 });
+const mailer=enquiryMailer(pool);
 app.use(cors({
   origin(origin, cb) {
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
@@ -40,6 +55,11 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+let stopping = false;
+app.get('/ready', readinessHandler(pool, () => stopping));
+// Explicit public brand assets; no broad repository/static directory exposure.
+app.get('/branding/brand.css',(_req,res)=>res.sendFile(fileURLToPath(new URL('../public/brand.css',import.meta.url))));
+app.get('/branding/logo.png',(_req,res)=>res.sendFile(fileURLToPath(new URL('../../assets/img/logo-transparent.png',import.meta.url))));
 const leadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 5,
@@ -88,6 +108,7 @@ app.get('/client-portal', async (_req,res,next)=>{try{
 // Password recovery is hosted on the API domain so it works before the public site deploy.
 app.get('/staff-login', async (_req, res, next) => {
   try {
+    if(process.env.STAFF_CRM_ENABLED==='true')return res.redirect('/admin-panel?account=employee');
     const page = await readFile(fileURLToPath(new URL('../public/staff-login.html', import.meta.url)), 'utf8');
     res.set('Content-Security-Policy',pageSecurity(page,{supabase:false}));
     res.set('X-Robots-Tag','noindex, nofollow');
@@ -132,7 +153,7 @@ app.post('/api/admin/password-recovery', recoveryLimiter, async (req, res, next)
     if (!process.env.OWNER_EMAIL || process.env.OWNER_EMAIL.toLowerCase() !== email.toLowerCase()) {
       return res.json({ message: 'If this is the Owner account, a recovery email will be sent.' });
     }
-    const redirectTo = 'https://mishnex-crm-api.onrender.com/reset-password';
+    const redirectTo = new URL('/reset-password',process.env.RENDER_EXTERNAL_URL || 'https://mishnex-crm-api.onrender.com').href;
     const response = await fetch(new URL('/auth/v1/recover?redirect_to=' + encodeURIComponent(redirectTo), process.env.SUPABASE_URL), {
       method: 'POST', headers: { apikey: process.env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }), signal: AbortSignal.timeout(8000)
@@ -198,13 +219,24 @@ async function requireOwner(req, res, next) {
 }
 app.use('/api/admin/staff', staffRoutes({ pool, requireOwner }));
 app.use('/api/admin/hr', hrRoutes({ pool, requireOwner }));
-app.use('/api/admin/erp', erpRoutes({ pool, requireOwner }));
+app.use('/api/admin/erp', erpRoutes({ pool, requireOwner, authorize:workspaceAuth(pool) }));
 app.use('/api/client', portalRoutes({ pool }));
+app.use('/api/admin/quotations',quotationRoutes({pool,authorize:workspaceAuth(pool)}));
+app.use('/api/public',upiRoutes({pool}));
+app.use('/api/quote-link',quoteLinkRoutes({pool}));
+app.get('/quotation',async(_req,res,next)=>{try{const page=await readFile(fileURLToPath(new URL('../public/quotation.html',import.meta.url)),'utf8');res.set('Content-Security-Policy',pageSecurity(page));res.set('Referrer-Policy','no-referrer');res.set('Cache-Control','no-store');res.set('X-Robots-Tag','noindex,nofollow');res.type('html').send(page)}catch(e){next(e)}});
+app.use('/api/admin/records',recordDirectoryRoutes({pool,authorize:workspaceAuth(pool)}));
+app.use('/api/admin/invoice-documents',invoiceRoutes({pool,authorize:workspaceAuth(pool)}));
+app.use('/api/admin/employee-activity',employeeActivityRoutes({pool,authorize:workspaceAuth(pool)}));
+app.use('/api/admin/payment-controls',paymentControlRoutes({pool,authorize:workspaceAuth(pool)}));
+app.use('/api/admin/settings',policyRoutes({pool,requireOwner}));
+app.use('/api/admin/lead-pool',leadPoolRoutes({pool,authorize:workspaceAuth(pool)}));
+app.use('/api/admin/payments', paymentRoutes({pool,authorize:workspaceAuth(pool),requireOwner}));
 app.use('/api/admin/lead-workflow', leadWorkflowRoutes({ pool, requireOwner }));
 app.use('/api/admin/clients', clientRoutes({ pool, requireOwner }));
 app.get('/api/admin/me', requireOwner, (req, res) => {
   res.set('Cache-Control', 'no-store');
-  res.json({ id: req.owner.id, email: req.owner.email, role: 'owner' });
+  res.json({ id: req.owner.id, accountCode: 'MISH-OWN-000001', fullName: req.owner.user_metadata?.full_name || req.owner.user_metadata?.name || 'Owner', email: req.owner.email, role: 'owner' });
 });
 app.get('/api/admin/leads', requireOwner, async (req, res, next) => {
   const rawStatus = req.query.status;
@@ -227,4 +259,17 @@ app.use((error, _req, res, _next) => {
   res.status(500).json({ error: 'Unable to submit right now. Please try again.' });
 });
 const port = Number(process.env.PORT || 4000);
-app.listen(port, () => console.log(`Mishnex CRM API listening on port ${port}`));
+const server = app.listen(port, () => console.log(`Mishnex CRM API listening on port ${port}`));
+function shutdown() {
+  if (stopping) return;
+  stopping = true;
+  mailer.stop();
+  const deadline = setTimeout(() => process.exit(1), 25000);
+  deadline.unref();
+  server.close(async () => {
+    try { await pool.end(); clearTimeout(deadline); process.exit(0); }
+    catch { process.exit(1); }
+  });
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
