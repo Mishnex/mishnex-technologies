@@ -4,7 +4,7 @@ export const releaseTables = [
   'crm_projects','crm_project_tasks','crm_quotations','crm_invoices','crm_website_content',
   'crm_client_portal_access','crm_invoice_payments','crm_payment_review_grants',
   'crm_payment_submissions','crm_payment_audit','crm_business_policy','crm_payment_control_audit',
-  'crm_client_login_accounts','crm_staff_call_activity','crm_staff_work_activity','crm_invoice_detail_audit'
+  'crm_client_login_accounts','crm_staff_call_activity','crm_staff_work_activity','crm_invoice_detail_audit','crm_lead_assignments','crm_enquiry_mail_outbox'
 ].map(name => 'public.' + name);
 
 export function readinessHandler(pool, isStopping = () => false) {

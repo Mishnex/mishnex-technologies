@@ -21,6 +21,8 @@ import {invoiceRoutes} from './invoice-routes.js';
 import {employeeActivityRoutes} from './employee-activity-routes.js';
 import { policyRoutes } from './policy-routes.js';
 import { workspaceAuth } from './workspace-auth.js';
+import {enquiryMailer} from './enquiry-mail.js';
+import {leadPoolRoutes} from './lead-pool-routes.js';
 import { paymentRoutes } from './payment-routes.js';
 import { portalRoutes } from './portal-routes.js';
 import { leadWorkflowRoutes } from './lead-routes.js';
@@ -43,6 +45,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true, ...(process.env.DATABASE_CA_CERT ? { ca: process.env.DATABASE_CA_CERT.replace(/\\n/g, '\n') } : {}) } : undefined
 });
+const mailer=enquiryMailer(pool);
 app.use(cors({
   origin(origin, cb) {
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
@@ -227,6 +230,7 @@ app.use('/api/admin/invoice-documents',invoiceRoutes({pool,authorize:workspaceAu
 app.use('/api/admin/employee-activity',employeeActivityRoutes({pool,authorize:workspaceAuth(pool)}));
 app.use('/api/admin/payment-controls',paymentControlRoutes({pool,authorize:workspaceAuth(pool)}));
 app.use('/api/admin/settings',policyRoutes({pool,requireOwner}));
+app.use('/api/admin/lead-pool',leadPoolRoutes({pool,authorize:workspaceAuth(pool)}));
 app.use('/api/admin/payments', paymentRoutes({pool,authorize:workspaceAuth(pool),requireOwner}));
 app.use('/api/admin/lead-workflow', leadWorkflowRoutes({ pool, requireOwner }));
 app.use('/api/admin/clients', clientRoutes({ pool, requireOwner }));
@@ -259,6 +263,7 @@ const server = app.listen(port, () => console.log(`Mishnex CRM API listening on 
 function shutdown() {
   if (stopping) return;
   stopping = true;
+  mailer.stop();
   const deadline = setTimeout(() => process.exit(1), 25000);
   deadline.unref();
   server.close(async () => {

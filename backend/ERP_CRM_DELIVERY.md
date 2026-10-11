@@ -13,9 +13,17 @@ The feature release is deployed to isolated staging. Production remains on its o
 - Optional client/company GSTIN, audited invoice billing/cost corrections, customer-isolated invoice PDFs with orange company logo and embedded fonts. Recorded margin excludes unknown costs and does not represent net profit.
 - Independent login failure budgets for colleagues/customers sharing an internet connection, plus an IP-wide spraying limit. Database readiness endpoint and graceful service shutdown. CI installs the lockfile and checks migration integrity.
 
+## Added enquiry, lead and approval workflow
+
+- Payment review searches quotation ID, requires bank verification remarks and validates the selected approving role against the signed-in account. Existing Owner delegation is still required for Super Admin approval. Audit records snapshot approver name, employee ID, quotation ID and date/time; they are retained indefinitely (at least three months), without automatic deletion of financial evidence.
+- Approved payments set booking confirmation. Create a project with its accepted quotation and matching client; marking all associated projects completed displays Project completed in the private quotation and customer portal. Existing unlinked projects do not infer a quotation from client name.
+- Website enquiries and manual contact pools are Owner/Super Admin-only. Repeated batches support additional contacts; removal is soft and preserves assignment/call history. Each staff member may generate one contact, close it with remarks, then generate another. Database row locks and unique constraints prevent duplicate assignment and simultaneous open leads for the same actor.
+- Performance has India-time daily/weekly/monthly/custom filters, generated leads, reported calls and conversions, quotation creator/time and invoice contribution by currency. Financial periods select invoice creation dates; verified paid is the current balance for those invoices. Recorded margin excludes invoices with missing costs; it is not net profit.
+- New website enquiries enqueue an email atomically with contact storage. SMTP delivery retries in the background; the company recipient defaults to info@mishnex.com. Set SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS and SMTP_FROM privately on Render. Without configuration, email stays queued and the enquiry page says so. Email delivery must be verified before production launch; database capture alone is not email delivery.
+
 ## Evidence
 
-- 251 automated tests pass locally. GitHub CI #524 passed on release-hardening commit `01f20b79f813640d84a7d0ee31ba05c8f26acc77`; the embedded-font/release-document commit is checked independently in the linked PR checks.
+- 273 automated tests pass locally (lead pool and payment review additions). GitHub CI #524 passed on release-hardening commit `01f20b79f813640d84a7d0ee31ba05c8f26acc77`; the embedded-font/release-document commit is checked independently in the linked PR checks.
 - Real staging Owner login succeeded. Employee directory opened an existing Sales employee's complete record.
 - Real Owner browser created a disposable two-item quotation: 2 × INR 100 plus 3 × INR 50 = INR 350. Private sharing and Owner fixed INR 100 advance succeeded.
 - Private checkout created one issued invoice without crediting money. Full payment selected INR 350; part payment selected INR 100. A explicitly simulated QA reference produced pending confirmation: reported INR 100, verified paid INR 0, remaining INR 350, expected after approval INR 250.

@@ -21,3 +21,6 @@ test('review requires reason before DB',async()=>{const r=await run({body:{actio
 test('amount rejects sub-paisa precision',()=>{assert.equal(paymentAmount.safeParse(0.001).success,false);assert.equal(paymentAmount.safeParse(1.23).success,true)});
 
 test('same bank reference cannot be credited against a different invoice',async()=>{const r=await run({credited:true});assert.equal(r.status,409);assert.ok(!r.calls.some(c=>c.sql.startsWith('insert')));assert.ok(r.calls.some(c=>c.sql.includes('pg_advisory_xact_lock')))});
+
+test('review role cannot impersonate another approver',async()=>{const r=await run({role:'super_admin',body:{action:'approved',reason:'Verified in bank',reviewerRole:'owner'}});assert.equal(r.status,403);assert.equal(r.calls.length,0)});
+test('audit snapshots approver identity and quotation from database',async()=>{const r=await run({body:{action:'approved',reason:'Verified in bank',reviewerRole:'owner'}});assert.equal(r.status,200);const audit=r.calls.find(c=>c.sql.startsWith('insert into public.crm_payment_audit'));assert.match(audit.sql,/actor_name,actor_code,quotation_id,quotation_code/);assert.match(audit.sql,/s.user_id=\$2/);assert.match(audit.sql,/q.id=i.quotation_id/);assert.equal(audit.params[1],'owner-id')});

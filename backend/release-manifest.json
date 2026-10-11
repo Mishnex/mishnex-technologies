@@ -116,6 +116,11 @@
       "order": 21,
       "path": "supabase/migrations/20261011094802_directory_record_indexes.sql",
       "sha256": "d1be52d3fbd7bee173b9eb47bc95c2720706a07dba4a65ad59b332d52a3e7311"
+    },
+    {
+      "order": 22,
+      "path": "supabase/migrations/20261011104059_lead_assignment_payment_audit.sql",
+      "sha256": "b74708459ba8b7cf03821594426907234b1f02cba26ac94050140e9f097f4183"
     }
   ]
 }

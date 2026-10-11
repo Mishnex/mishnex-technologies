@@ -9,7 +9,7 @@ export function employeeActivityRoutes({pool,authorize}){
  r.post('/calls',leadAccess,async(req,res,next)=>{
   const p=logSchema.safeParse(req.body);if(!p.success)return res.status(400).json({error:'Check call outcome, note, duration and follow-up date.'});
   try{const d=p.data,result=await transaction(pool,async client=>{
-   const lead=await client.query('select id from public.crm_leads where id=$1',[d.leadId]);if(!lead.rowCount)reject(404,'Lead not found.');
+   const lead=await client.query('select id from public.crm_leads where id=$1 and ($2::boolean or exists(select 1 from public.crm_lead_assignments a where a.lead_id=crm_leads.id and a.actor_id=$3))',[d.leadId,req.actor.owner||req.actor.role==='super_admin',req.actor.id]);if(!lead.rowCount)reject(404,'Lead not found.');
    const values=[req.actor.id,d.leadId,d.requestId,d.kind,d.outcome,d.durationSeconds,d.note,d.nextFollowUp];
    const saved=await client.query('insert into public.crm_staff_call_activity(actor_id,lead_id,request_id,kind,outcome,duration_seconds,note,next_follow_up) values($1,$2,$3,$4,$5,$6,$7,$8) on conflict(actor_id,request_id) do nothing returning *',values);
    if(saved.rowCount)return{activity:saved.rows[0],created:true};
@@ -19,8 +19,9 @@ export function employeeActivityRoutes({pool,authorize}){
   });res.status(result.created?201:200).json(result)}catch(e){if(e.status)return res.status(e.status).json({error:e.message});next(e)}
  });
  r.get('/calls',leadAccess,async(req,res,next)=>{try{const result=await pool.query('select a.*,l.name as lead_name from public.crm_staff_call_activity a join public.crm_leads l on l.id=a.lead_id where a.actor_id=$1 order by a.created_at desc,a.id desc limit 100',[req.actor.id]);res.json({activities:result.rows})}catch(e){next(e)}});
+ r.get('/people',async(req,res,next)=>{if(!req.actor.owner&&req.actor.role!=='super_admin')return res.status(403).json({error:'Management access required.'});try{res.json({ownerId:process.env.OWNER_USER_ID,staff:(await pool.query('select user_id,employee_code,full_name,role,is_active from public.crm_staff order by full_name limit 1000')).rows})}catch(e){next(e)}});
  r.get('/report',async(req,res,next)=>{
-  if(!req.actor.owner)return res.status(403).json({error:'Owner access required.'});
+  if(!req.actor.owner&&req.actor.role!=='super_admin')return res.status(403).json({error:'Owner or Super Admin access required.'});
   const p=z.object({from:date,to:date,employeeId:z.string().uuid().optional()}).strict().safeParse(req.query);
   if(!p.success||p.data.to<p.data.from||Date.parse(p.data.to)-Date.parse(p.data.from)>366*86400000)return res.status(400).json({error:'Choose a valid date range of up to 366 days.'});
   const {from,to,employeeId}=p.data,params=[from+'T00:00:00+05:30',to+'T00:00:00+05:30',process.env.OWNER_USER_ID,employeeId||null];
@@ -36,7 +37,10 @@ export function employeeActivityRoutes({pool,authorize}){
     union all select actor_id,created_at,action,resource,record_id::text,detail from public.crm_staff_work_activity
     union all select actor_id,created_at,'status / note','Lead',lead_id::text,jsonb_build_object('from',from_status,'to',to_status,'note',note) from public.crm_lead_activity)
     select e.*,s.full_name,s.employee_code from events e left join public.crm_staff s on s.user_id=e.actor_id where e.created_at >= $1::timestamptz and e.created_at < $2::timestamptz+interval '1 day' and ($3::uuid is null or e.actor_id=$3::uuid) order by e.created_at desc,e.module,e.record_id limit 200`,[params[0],params[1],employeeId||null]);
-   res.json({summary:summary.rows,history:history.rows,timezone:'Asia/Kolkata',historyLimit:200,message:'Calls are employee-reported logs, not automatic phone records. Task and other work events start when tracking is enabled; earlier quotations and lead updates use existing records.'});
+   const assignments=await pool.query(`select actor_id,count(*) filter(where created_at >= $1::timestamptz and created_at < $2::timestamptz+interval '1 day')::int as leads_generated,count(*) filter(where closed_at >= $1::timestamptz and closed_at < $2::timestamptz+interval '1 day' and outcome='converted')::int as leads_converted from public.crm_lead_assignments where ($3::uuid is null or actor_id=$3::uuid) group by actor_id`,[params[0],params[1],employeeId||null]);
+   const financial=await pool.query(`select q.created_by as actor_id,s.full_name,s.employee_code,i.currency,count(distinct i.client_id)::int clients_brought,sum(i.amount) as invoiced,sum(i.paid_amount) as verified_paid,sum(i.amount-i.delivery_cost) filter(where i.delivery_cost is not null) as recorded_margin,count(*) filter(where i.delivery_cost is null)::int missing_cost_invoices from public.crm_invoices i join public.crm_quotations q on q.id=i.quotation_id left join public.crm_staff s on s.user_id=q.created_by where i.status in ('issued','part_paid','paid') and i.created_at >= $1::timestamptz and i.created_at < $2::timestamptz+interval '1 day' and ($3::uuid is null or q.created_by=$3::uuid) group by q.created_by,s.full_name,s.employee_code,i.currency`,[params[0],params[1],employeeId||null]);
+   for(const row of summary.rows)Object.assign(row,assignments.rows.find(a=>a.actor_id===row.user_id)||{leads_generated:0,leads_converted:0});
+   res.json({financial:financial.rows,summary:summary.rows,history:history.rows,timezone:'Asia/Kolkata',historyLimit:200,message:'Calls are employee-reported logs, not automatic phone records. Task and other work events start when tracking is enabled; earlier quotations and lead updates use existing records.'});
   }catch(e){next(e)}
  });return r;
 }
