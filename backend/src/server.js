@@ -52,6 +52,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+// Host-based landing redirects for custom subdomains; preserve existing page routes.
+app.get('/', (req, res, next) => {
+  const host = (req.hostname || '').toLowerCase();
+  if (host === 'admin.mishnextechnologies.com') return res.redirect(302, '/admin-panel');
+  if (host === 'client.mishnextechnologies.com') return res.redirect(302, '/client-portal');
+  if (host === 'quotation.mishnextechnologies.com') return res.redirect(302, '/quotation');
+  next();
+});
+
 let stopping = false;
 app.get('/ready', readinessHandler(pool, () => stopping));
 // Explicit public brand assets; no broad repository/static directory exposure.
