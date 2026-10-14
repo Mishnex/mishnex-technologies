@@ -8,6 +8,7 @@ import pg from 'pg';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import {leadIntegrationRoutes} from './lead-integration-routes.js';
 import { leadSchema } from './validation.js';
 import { staffRoutes } from './staff.js';
 import { hrRoutes } from './hr-routes.js';
@@ -24,6 +25,7 @@ import { policyRoutes } from './policy-routes.js';
 import { workspaceAuth } from './workspace-auth.js';
 import {enquiryMailer} from './enquiry-mail.js';
 import {leadPoolRoutes} from './lead-pool-routes.js';
+import {leadImportRoutes} from './lead-import-routes.js';
 import { paymentRoutes } from './payment-routes.js';
 import { portalRoutes } from './portal-routes.js';
 import { leadWorkflowRoutes } from './lead-routes.js';
@@ -36,7 +38,7 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(helmet());
-app.use(express.json({ limit: '16kb' }));
+app.use((req,res,next)=>req.path.startsWith('/api/admin/lead-import/')||req.path.startsWith('/api/integrations/leads/')?next():express.json({limit:'16kb'})(req,res,next));
 const allowedOrigins = [...new Set([...(process.env.ALLOWED_ORIGINS || '').split(','), process.env.RENDER_EXTERNAL_URL || ''].map(v => v.trim()).filter(Boolean))];
 if (!process.env.DATABASE_URL || !allowedOrigins.length) {
   throw new Error('DATABASE_URL and ALLOWED_ORIGINS are required');
@@ -51,6 +53,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+app.use('/api/integrations/leads',leadIntegrationRoutes({pool}));
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 // Host-based landing redirects for custom subdomains; preserve existing page routes.
 app.get('/', (req, res, next) => {
@@ -237,6 +240,7 @@ app.use('/api/admin/employee-activity',employeeActivityRoutes({pool,authorize:wo
 app.use('/api/admin/payment-controls',paymentControlRoutes({pool,authorize:workspaceAuth(pool)}));
 app.use('/api/admin/settings',policyRoutes({pool,requireOwner}));
 app.use('/api/admin/lead-pool',leadPoolRoutes({pool,authorize:workspaceAuth(pool)}));
+app.use('/api/admin/lead-import',leadImportRoutes({pool,authorize:workspaceAuth(pool)}));
 app.use('/api/admin/payments', paymentRoutes({pool,authorize:workspaceAuth(pool),requireOwner}));
 app.use('/api/admin/lead-workflow', leadWorkflowRoutes({ pool, requireOwner }));
 app.use('/api/admin/clients', clientRoutes({ pool, requireOwner }));
