@@ -247,3 +247,6 @@ if (successModal) {
   });
   window.addEventListener('beforeunload', () => window.clearTimeout(timer));
 })();
+
+// Ensure looping project previews stay muted and restart after tab visibility changes.
+document.querySelectorAll('.showcase-media video').forEach(v => { v.muted=true;v.loop=true;v.playsInline=true;v.addEventListener('ended',()=>{v.currentTime=0;v.play().catch(()=>{});});v.play().catch(()=>{});});
