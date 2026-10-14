@@ -24,6 +24,7 @@ import { policyRoutes } from './policy-routes.js';
 import { workspaceAuth } from './workspace-auth.js';
 import {enquiryMailer} from './enquiry-mail.js';
 import {leadPoolRoutes} from './lead-pool-routes.js';
+import {leadImportRoutes} from './lead-import-routes.js';
 import { paymentRoutes } from './payment-routes.js';
 import { portalRoutes } from './portal-routes.js';
 import { leadWorkflowRoutes } from './lead-routes.js';
@@ -237,6 +238,7 @@ app.use('/api/admin/employee-activity',employeeActivityRoutes({pool,authorize:wo
 app.use('/api/admin/payment-controls',paymentControlRoutes({pool,authorize:workspaceAuth(pool)}));
 app.use('/api/admin/settings',policyRoutes({pool,requireOwner}));
 app.use('/api/admin/lead-pool',leadPoolRoutes({pool,authorize:workspaceAuth(pool)}));
+app.use('/api/admin/lead-import',leadImportRoutes({pool,authorize:workspaceAuth(pool)}));
 app.use('/api/admin/payments', paymentRoutes({pool,authorize:workspaceAuth(pool),requireOwner}));
 app.use('/api/admin/lead-workflow', leadWorkflowRoutes({ pool, requireOwner }));
 app.use('/api/admin/clients', clientRoutes({ pool, requireOwner }));
