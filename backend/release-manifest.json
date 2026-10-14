@@ -1,0 +1,131 @@
+{
+  "productionProject": "wgvqbxgeezrurvnownsd",
+  "stagingProject": "svhdqexfcyvqnpxuszim",
+  "foundationRequired": [
+    "crm_leads",
+    "crm_staff",
+    "crm_staff_audit",
+    "crm_super_admin_sessions",
+    "crm_register_super_admin_session",
+    "crm_begin_staff_password_change",
+    "crm_complete_staff_password_change",
+    "crm_revoke_staff_sessions_on_logout"
+  ],
+  "migrations": [
+    {
+      "order": 1,
+      "path": "backend/migrations/20261010_module1_audit_action_alignment.sql",
+      "sha256": "ce2cd1a6118f856cfb0219b431499663e28397c9dec4c1f2865e395184aefab6"
+    },
+    {
+      "order": 2,
+      "path": "backend/migrations/20261009_module2_lead_activity.sql",
+      "sha256": "1227b407e1c4a3a535899ee4931b7602b0ef614a94456d5581c72aadbc62e3a7"
+    },
+    {
+      "order": 3,
+      "path": "backend/migrations/20261010_module2_clients_draft.sql",
+      "sha256": "09edb21928668e83ccd8bb7e21692621fd1597bea92bee25667030dbc4d50e83"
+    },
+    {
+      "order": 4,
+      "path": "backend/migrations/20261010_add_hr_staff_role.sql",
+      "sha256": "74676cb41d0132ee6133ab91eb641b5183ef10d0a10b6c6140f18c5200aa69e1"
+    },
+    {
+      "order": 5,
+      "path": "backend/migrations/20261010_hr_management_foundation.sql",
+      "sha256": "8c2752f8578ac284effe60f3353669bcd08ee69950303a3382a6a92f8ccbb0a7"
+    },
+    {
+      "order": 6,
+      "path": "backend/migrations/20261010_erp_core_foundation.sql",
+      "sha256": "60406aff4fabaef5881da95dd503d8f98d668a8965608df481c54c4b45912add"
+    },
+    {
+      "order": 7,
+      "path": "backend/migrations/20261010_client_portal_access.sql",
+      "sha256": "18d37ba27fcab2216f6c116f020dd02bbff39e21791f31e1095b91ffa4758fb5"
+    },
+    {
+      "order": 8,
+      "path": "backend/migrations/20261010_invoice_payment_ledger.sql",
+      "sha256": "d49dd35e8d0a47bba11da9f2c98c7e7f1c9dbcc8ca935cbd881fe4e58a75c952"
+    },
+    {
+      "order": 9,
+      "path": "backend/sql/002_payment_review.sql",
+      "sha256": "6c9a0e03f3a7b5090d2e5dd32a5113c54a12ada0ad209679cf92ad7195ede153"
+    },
+    {
+      "order": 10,
+      "path": "backend/sql/003_business_policy.sql",
+      "sha256": "e339fd9d313d78ea37ef467a9b137fe0a07c378ba09705671ba5ff177194b1d8"
+    },
+    {
+      "order": 11,
+      "path": "backend/sql/004_itemized_quotations.sql",
+      "sha256": "5436ffb5c4fd3003501837f71ac30a88ab1148a8b8abda253c0a5950c52cb9f3"
+    },
+    {
+      "order": 12,
+      "path": "backend/sql/005_multiple_upi_options.sql",
+      "sha256": "d27a39349ad34320e6fdfb1f5954ae2b357df136119910a774bf8a8f4cc7797e"
+    },
+    {
+      "order": 13,
+      "path": "backend/sql/006_payment_controls.sql",
+      "sha256": "7855a8c840ec913ef2a4c17a2b21ffccae8496953e0349d77164594839814672"
+    },
+    {
+      "order": 14,
+      "path": "backend/sql/007_client_login_accounts.sql",
+      "sha256": "dca75ded1895bc3cd7191fdceb2079b67758262420733747e65c74677dcaab39"
+    },
+    {
+      "order": 15,
+      "path": "backend/sql/008_unique_bank_reference.sql",
+      "sha256": "1b5be42c2c7e1e4673f2189354bc5699b4e34b27db5d69d5ed80e94a74b2c6d1"
+    },
+    {
+      "order": 16,
+      "path": "backend/sql/009_private_rls_event_trigger.sql",
+      "sha256": "6c2cb492c3e67b90be93637b53d647f6b06d7abd232ae57ed6528d265877e07f"
+    },
+    {
+      "order": 17,
+      "path": "backend/sql/010_readable_identifiers.sql",
+      "sha256": "8eaa79440dc4d74f46ea0fdca3db149281f0f2c82fb5793ddfffd240e7e76d61"
+    },
+    {
+      "order": 18,
+      "path": "backend/sql/011_employee_activity.sql",
+      "sha256": "1e421028faeb18771eb0a16ec2fee165d798a554c9ff98c9a11e634eb5c1e935"
+    },
+    {
+      "order": 19,
+      "path": "backend/sql/012_mishnex_role_identifiers.sql",
+      "sha256": "c70f48f7f62cf0059ea4081f3b9559a89cabce50c31185eb53f4c67ad6d23677"
+    },
+    {
+      "order": 20,
+      "path": "supabase/migrations/20261011093826_directory_invoice_details.sql",
+      "sha256": "375570f90ecb7803e766557f0d651d85db7f020cf053bf7f055769e8429f3845"
+    },
+    {
+      "order": 21,
+      "path": "supabase/migrations/20261011094802_directory_record_indexes.sql",
+      "sha256": "d1be52d3fbd7bee173b9eb47bc95c2720706a07dba4a65ad59b332d52a3e7311"
+    },
+    {
+      "order": 22,
+      "path": "supabase/migrations/20261011104059_lead_assignment_payment_audit.sql",
+      "sha256": "b74708459ba8b7cf03821594426907234b1f02cba26ac94050140e9f097f4183"
+    },
+    {
+      "order": 23,
+      "path": "supabase/migrations/20261011110012_manual_lead_locations.sql",
+      "sha256": "9c32cc9bab006ba360afda38fa5c0fb99b9b841435514fe1c6e7641336059874"
+    }
+  ]
+}

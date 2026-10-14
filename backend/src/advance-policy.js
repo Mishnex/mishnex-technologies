@@ -1,0 +1,1 @@
+export function advanceRequired(total,paid,percent=30,fixed=null){const totalCents=Math.round(Number(total)*100),paidCents=Math.round(Number(paid)*100);const requested=fixed==null?Math.round(totalCents*Number(percent??30)/100):Math.round(Number(fixed)*100);return Math.max(0,Math.min(totalCents-paidCents,requested-paidCents))/100}

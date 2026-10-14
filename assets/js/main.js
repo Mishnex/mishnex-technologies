@@ -101,20 +101,47 @@ function setupForm(form) {
     input.addEventListener('blur', () => validateField(name, true));
   });
 
-  form.addEventListener('submit', (event) => {
+  form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const ok = Object.keys(fields).every((name) => validateField(name, true));
+    const valid = Object.keys(fields).map((name) => validateField(name, true)).every(Boolean);
     const success = $('#formSuccess', form);
-    if (!ok) {
-      if (success) success.style.display = 'none';
-      return;
-    }
-    if (form.closest('body') && location.pathname.toLowerCase().includes('contact')) {
-      const modal = $('#successModal');
-      if (modal) { modal.classList.add('show'); modal.setAttribute('aria-hidden','false'); }
-      form.reset();
+    const submitButton = $('button[type="submit"]', form);
+    let feedback = $('.crm-submit-feedback', form);
+    if (!feedback) {
+      feedback = document.createElement('p');
+      feedback.className = 'crm-submit-feedback';
+      feedback.setAttribute('role', 'status');
+      feedback.setAttribute('aria-live', 'polite');
+      form.appendChild(feedback);
     }
     if (success) success.style.display = 'none';
+    if (!valid || submitButton?.disabled) return;
+    const data = new FormData(form);
+    const payload = Object.fromEntries(['name','email','phone','service','budget','calltime','requirement']
+      .map((key) => [key, String(data.get(key) || '').trim()]));
+    feedback.textContent = 'Submitting your enquiry...';
+    if (submitButton) submitButton.disabled = true;
+    try {
+      const response = await fetch('https://mishnex-crm-api.onrender.com/api/public/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error('Submission failed');
+      const result = await response.json();
+      if (result.received !== true || !result.leadId) throw new Error('No confirmation from CRM');
+      feedback.textContent = 'Thank you! Your enquiry has been submitted successfully.';
+      if (form.closest('body') && location.pathname.toLowerCase().includes('contact')) {
+        const modal = $('#successModal');
+        if (modal) { modal.classList.add('show'); modal.setAttribute('aria-hidden', 'false'); }
+      }
+      form.reset();
+      Object.keys(fields).forEach(clearState);
+    } catch (_error) {
+      feedback.textContent = 'Unable to submit your enquiry right now. Please try again, or contact us on WhatsApp.';
+    } finally {
+      if (submitButton) submitButton.disabled = false;
+    }
   });
 }
 $$('.lead-form').forEach(setupForm);
