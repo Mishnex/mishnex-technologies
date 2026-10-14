@@ -5,7 +5,7 @@ import { transaction, reject } from './transaction.js';
 
 // Server-side validation is repeated at commit time; previews never write data.
 const fields=['name','phone','email','location','service','requirement'];
-const aliases={name:['name','customer name','client name','full name'],phone:['phone','phone number','mobile','mobile no','contact number'],email:['email','email address','mail id'],location:['location','city','area','address'],service:['service','service required','interested in'],requirement:['requirement','requirements','notes','remarks']};
+const aliases={name:['name','customer name','client name','full name'],phone:['phone','phone number','mobile','mobile no','contact number'],email:['email','email address','mail id'],location:['location','city','area','address'],service:['service','service required','interested in'],requirement:['requirement','requirements','notes','remarks','requirement / notes','requirement notes']};
 const rowSchema=z.object({name:z.string().trim().min(2).max(100),phone:z.string().trim().min(7).max(20).regex(/^\+?[0-9 ()-]+$/).refine(v=>v.replace(/\D/g,'').length>=7,'Enter a valid phone number'),email:z.union([z.string().trim().email().max(254),z.literal('')]).default(''),location:z.string().trim().min(2).max(180),service:z.string().trim().min(2).max(120).default('Sales enquiry'),requirement:z.string().trim().max(3000).default('Bulk imported lead')});
 const norm=s=>String(s??'').trim().toLowerCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');
 function allowed(req){return !!(req.actor?.owner||req.actor?.role==='super_admin');}

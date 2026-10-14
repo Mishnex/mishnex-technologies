@@ -1,8 +1,9 @@
 import ExcelJS from 'exceljs';
+import {compatibleXlsx} from './xlsx-compatibility.js';
 import {reject} from './transaction.js';
 export async function readSpreadsheet(buffer, sheetName) {
  const book=new ExcelJS.Workbook();
- try { await book.xlsx.load(buffer); } catch { reject(400,'Cannot read this Excel file. Upload an unencrypted .xlsx file.'); }
+ try { await book.xlsx.load(await compatibleXlsx(buffer)); } catch { reject(400,'Cannot read this Excel file. Upload an unencrypted .xlsx file.'); }
  const sheets=book.worksheets.filter(s=>s.state==='visible');
  const sheet=sheetName?sheets.find(s=>s.name===sheetName):sheets[0];
  if(!sheet)reject(400,'Choose a visible worksheet.');
