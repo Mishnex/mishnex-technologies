@@ -12,7 +12,7 @@ export function leadPoolRoutes({pool,authorize}){
  r.post('/generate',async(req,res,next)=>{try{const lead=await transaction(pool,async c=>{
   await c.query('select pg_advisory_xact_lock(hashtextextended($1,731))',[req.actor.id]);
   const old=await c.query(activeSQL,[req.actor.id]);if(old.rowCount)return old.rows[0];
-  const row=await c.query("select l.* from public.crm_leads l where l.source='manual' and l.removed_at is null and l.status='new' and not exists(select 1 from public.crm_lead_assignments a where a.lead_id=l.id) order by l.created_at,l.id for update of l skip locked limit 1");
+  const row=await c.query("select l.* from public.crm_leads l where l.source in ('manual','website','excel') and l.removed_at is null and l.status='new' and not exists(select 1 from public.crm_lead_assignments a where a.lead_id=l.id) order by random() for update of l skip locked limit 1");
   if(!row.rowCount)reject(409,'No unassigned leads available. Ask management to add contacts.');
   const a=await c.query('insert into public.crm_lead_assignments(lead_id,actor_id) values($1,$2) returning id,created_at',[row.rows[0].id,req.actor.id]);
   return {...row.rows[0],assignment_id:a.rows[0].id,assigned_at:a.rows[0].created_at};
