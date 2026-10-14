@@ -8,6 +8,7 @@ import pg from 'pg';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import {leadIntegrationRoutes} from './lead-integration-routes.js';
 import { leadSchema } from './validation.js';
 import { staffRoutes } from './staff.js';
 import { hrRoutes } from './hr-routes.js';
@@ -37,7 +38,7 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(helmet());
-app.use(express.json({ limit: '16kb' }));
+app.use((req,res,next)=>req.path.startsWith('/api/admin/lead-import/')||req.path.startsWith('/api/integrations/leads/')?next():express.json({limit:'16kb'})(req,res,next));
 const allowedOrigins = [...new Set([...(process.env.ALLOWED_ORIGINS || '').split(','), process.env.RENDER_EXTERNAL_URL || ''].map(v => v.trim()).filter(Boolean))];
 if (!process.env.DATABASE_URL || !allowedOrigins.length) {
   throw new Error('DATABASE_URL and ALLOWED_ORIGINS are required');
@@ -52,6 +53,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+app.use('/api/integrations/leads',leadIntegrationRoutes({pool}));
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 // Host-based landing redirects for custom subdomains; preserve existing page routes.
 app.get('/', (req, res, next) => {
